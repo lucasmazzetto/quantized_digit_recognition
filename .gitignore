@@ -306,3 +306,6 @@ __marimo__/
 
 # Dataset
 neural_network/data/
+
+# models
+neural_network/models/
