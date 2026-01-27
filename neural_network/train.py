@@ -32,6 +32,7 @@ def train_epoch(model:nn.Module, data_loader: DataLoader,
     for x, y in data_loader:
         # Reset gradients
         optimizer.zero_grad()
+        
         # Forward pass
         outputs = model(x)
 
@@ -39,6 +40,7 @@ def train_epoch(model:nn.Module, data_loader: DataLoader,
 
         # Backpropagation
         batch_loss.backward()
+        
         # Update model parameters
         optimizer.step()
 
@@ -107,10 +109,13 @@ def test(model: nn.Module, test_loader: DataLoader):
         for samples, labels in test_loader:
             # Forward pass
             outputs = model(samples)
+            
             # Compute probabilities
             probs = torch.nn.functional.softmax(outputs, dim=1)
+            
             # Get predicted class
             preds = torch.argmax(probs, dim=1)
+            
             # Accumulate correct predictions
             acc += (preds == labels).sum()
 
@@ -141,20 +146,31 @@ if __name__ == '__main__':
     
     args = parser.parse_args()
 
-    # Define data transformations: Grayscale, Tensor conversion, and Normalization
-    transform = transforms.Compose([transforms.Grayscale(),
-                                    transforms.ToTensor(),
-                                    transforms.Normalize((0.5,), (0.5,))])
+    # Augmentation for training and validation
+    train_transform = transforms.Compose([transforms.Grayscale(),
+                                          transforms.RandomRotation(15),
+                                          transforms.RandomAffine(degrees=0, translate=(0.1, 0.1), scale=(0.9, 1.1), shear=10),
+                                          transforms.RandomPerspective(distortion_scale=0.2, p=0.5),
+                                          transforms.ColorJitter(brightness=0.2, contrast=0.2),
+                                          transforms.GaussianBlur(kernel_size=3),
+                                          transforms.ToTensor(),
+                                          transforms.RandomErasing(p=0.2, scale=(0.02, 0.1)),
+                                          transforms.Normalize((0.5,), (0.5,))])
+
+    # No augmentation for testing
+    test_transform = transforms.Compose([transforms.Grayscale(),
+                                         transforms.ToTensor(),
+                                         transforms.Normalize((0.5,), (0.5,))])
 
     # Download and load the MNIST training dataset
-    mnist = datasets.MNIST(root=args.dataset_path, train=True, download=True, transform=transform)
+    mnist = datasets.MNIST(root=args.dataset_path, train=True, download=True, transform=train_transform)
     
     # Split the dataset into training and validation sets
     train_dataset, val_dataset = random_split(mnist, [round(len(mnist) * args.train_split), 
                                                       round(len(mnist) * (1 - args.train_split))])
 
     # Download and load the MNIST test dataset
-    test_dataset = datasets.MNIST(root=args.dataset_path, train=False, download=True, transform=transform)
+    test_dataset = datasets.MNIST(root=args.dataset_path, train=False, download=True, transform=test_transform)
 
     # Initialize the Convolutional Neural Network
     model = ConvNet(h=28, w=28, inputs=1, outputs=10)
