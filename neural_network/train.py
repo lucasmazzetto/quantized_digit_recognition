@@ -45,6 +45,7 @@ def train_epoch(model:nn.Module, data_loader: DataLoader,
         optimizer.step()
 
         loss += batch_loss.item()
+        
     return loss / num_batches
 
 
@@ -90,7 +91,8 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader,
     for epoch in range(num_epochs):
         train_loss = train_epoch(model, train_loader, optimizer, loss_fn)
         val_loss = eval_epoch(model, val_loader, loss_fn)
-        print(f"Epoch [{epoch + 1}/{num_epochs}] - Train Loss: {train_loss:.5f} | Validation Loss: {val_loss:.5f}")
+        print(f"Epoch [{epoch + 1}/{num_epochs}] - "
+              f"Train Loss: {train_loss:.5f} | Validation Loss: {val_loss:.5f}")
 
 
 def test(model: nn.Module, test_loader: DataLoader):
@@ -122,55 +124,37 @@ def test(model: nn.Module, test_loader: DataLoader):
     print(f"Test Set Accuracy: {(acc / len(test_loader.dataset))*100.0:.3f}%")
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="Train a Convolutional Neural Network (CNN) on the MNIST dataset.",
-                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    
-    parser.add_argument('--num_epochs', type=int, default=10, 
-                        help='Total number of epochs to train the model.')
-    
-    parser.add_argument('--batch_size', type=int, default=128, 
-                        help='Number of samples per batch during training and evaluation.')
-    
-    parser.add_argument('--train_split', type=float, default=0.8, 
-                        help='Ratio of the dataset to be used for training (remainder used for validation).')
-    
-    parser.add_argument('--dataset_path', type=Path, default='./data',
-                        help='Path to the directory where the MNIST dataset will be stored or downloaded.')
-    
-    parser.add_argument('--model_path', type=Path, default='./models', 
-                        help='Directory where the trained model checkpoint will be saved.')
-    
-    parser.add_argument('--num_workers', type=int, default=(multiprocessing.cpu_count() - 1),
-                        help="Number of subprocesses to use for data loading.")
-    
-    args = parser.parse_args()
-
+def main(args):
     # Augmentation for training and validation
     train_transform = transforms.Compose([transforms.Grayscale(),
-                                          transforms.RandomRotation(15),
-                                          transforms.RandomAffine(degrees=0, translate=(0.1, 0.1), scale=(0.9, 1.1), shear=10),
+                                          transforms.RandomRotation(30),
+                                          transforms.RandomAffine(degrees=0, 
+                                                                  translate=(0.25, 0.25), 
+                                                                  scale=(0.7, 1.3), shear=10),
                                           transforms.RandomPerspective(distortion_scale=0.2, p=0.5),
-                                          transforms.ColorJitter(brightness=0.2, contrast=0.2),
+                                          transforms.ColorJitter(brightness=0.5, contrast=0.5),
+                                          transforms.RandomInvert(p=0.5),
                                           transforms.GaussianBlur(kernel_size=3),
                                           transforms.ToTensor(),
-                                          transforms.RandomErasing(p=0.2, scale=(0.02, 0.1)),
                                           transforms.Normalize((0.5,), (0.5,))])
 
     # No augmentation for testing
     test_transform = transforms.Compose([transforms.Grayscale(),
+                                         transforms.RandomInvert(p=0.5),
                                          transforms.ToTensor(),
                                          transforms.Normalize((0.5,), (0.5,))])
 
     # Download and load the MNIST training dataset
-    mnist = datasets.MNIST(root=args.dataset_path, train=True, download=True, transform=train_transform)
+    mnist = datasets.MNIST(root=args.dataset_path, train=True,
+                           download=True, transform=train_transform)
     
     # Split the dataset into training and validation sets
     train_dataset, val_dataset = random_split(mnist, [round(len(mnist) * args.train_split), 
                                                       round(len(mnist) * (1 - args.train_split))])
 
     # Download and load the MNIST test dataset
-    test_dataset = datasets.MNIST(root=args.dataset_path, train=False, download=True, transform=test_transform)
+    test_dataset = datasets.MNIST(root=args.dataset_path, train=False, 
+                                  download=True, transform=test_transform)
 
     # Initialize the Convolutional Neural Network
     model = ConvNet(h=28, w=28, inputs=1, outputs=10)
@@ -180,9 +164,14 @@ if __name__ == '__main__':
     loss_fn = nn.CrossEntropyLoss()
 
     # Create DataLoaders for batching and shuffling
-    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True)
-    test_loader = DataLoader(test_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True)
+    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, 
+                              num_workers=args.num_workers, shuffle=True)
+    
+    val_loader = DataLoader(val_dataset, batch_size=args.batch_size, 
+                            num_workers=args.num_workers, shuffle=True)
+    
+    test_loader = DataLoader(test_dataset, batch_size=args.batch_size, 
+                             num_workers=args.num_workers, shuffle=False)
     
     # Execute the training loop
     train(model, train_loader, val_loader, optimizer, loss_fn, args.num_epochs)
@@ -195,3 +184,31 @@ if __name__ == '__main__':
                 'optimizer_state': optimizer.state_dict(),
                 'epoch': args.num_epochs},
                 os.path.join(args.model_path, 'model.pt'))
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(
+        description="Train a Convolutional Neural Network (CNN) on the MNIST dataset.",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    
+    parser.add_argument('--num_epochs', type=int, default=50, 
+                        help='Total number of epochs to train the model.')
+    
+    parser.add_argument('--batch_size', type=int, default=128, 
+                        help='Number of samples per batch during training and evaluation.')
+    
+    parser.add_argument('--train_split', type=float, default=0.8, 
+                        help='Ratio of the dataset to be used for training.')
+    
+    parser.add_argument('--dataset_path', type=Path, default='./data',
+                        help='Path to the directory where the MNIST dataset will be stored.')
+    
+    parser.add_argument('--model_path', type=Path, default='./models', 
+                        help='Directory where the trained model checkpoint will be saved.')
+    
+    parser.add_argument('--num_workers', type=int, default=(multiprocessing.cpu_count() - 1),
+                        help="Number of subprocesses to use for data loading.")
+    
+    args = parser.parse_args()
+
+    main(args)
