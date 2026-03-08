@@ -1,4 +1,5 @@
 numpy>=2
+matplotlib>=3.8
 torch==2.9.1
 torchvision==0.24.1
 pytorch-quantization==2.1.3

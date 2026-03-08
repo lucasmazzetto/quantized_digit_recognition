@@ -23,7 +23,6 @@ def collect_stats(model:nn.Module, data_loader: DataLoader, num_bins:int):
     @param model The model to calibrate.
     @param data_loader The data loader used for calibration.
     @param num_bins Number of histogram bins.
-    @return None.
     """
     model.eval()
 
@@ -61,7 +60,6 @@ def compute_amax(model:nn.Module, **kwargs):
 
     @param model The model containing quantizers.
     @param kwargs Extra keyword arguments passed to load_calib_amax.
-    @return None.
     """
     # Load calibration results
     for name, module in model.named_modules():

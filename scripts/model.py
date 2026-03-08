@@ -12,7 +12,6 @@ class ConvNet(nn.Module):
         @param w Input image width.
         @param inputs Number of input channels.
         @param outputs Number of output classes.
-        @return None.
         """
         super(ConvNet, self).__init__()
 

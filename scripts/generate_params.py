@@ -140,7 +140,6 @@ def write_header_file(path: Path, state_dict, layer_indices, dims: dict):
     @param state_dict Quantized state dictionary.
     @param layer_indices Sorted layer indices.
     @param dims Inferred dimensions dictionary.
-    @return None.
     """
     with path.open('w', encoding='utf-8') as f:
         f.write('#ifndef PARAMS\n#define PARAMS\n\n')
@@ -191,7 +190,6 @@ def write_source_file(path: Path, state_dict, layer_indices, frac_bits: int):
     @param state_dict Quantized state dictionary.
     @param layer_indices Sorted layer indices.
     @param frac_bits Number of fractional bits for fixed-point conversion.
-    @return None.
     """
     with path.open('w', encoding='utf-8') as f:
         f.write('#include "params.h"\n\n')
@@ -225,17 +223,17 @@ if __name__ == '__main__':
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--path', type=Path, default=Path('models/quantized.pt'),
                         help='Path to quantized checkpoint to convert (e.g., quantized.pt).')
-    parser.add_argument('--output-dir', type=Path, default=Path('src'),
+    parser.add_argument('--output_dir', type=Path, default=Path('src'),
                         help='Directory where generated params.c is written.')
-    parser.add_argument('--header-dir', type=Path, default=Path('include'),
+    parser.add_argument('--header_dir', type=Path, default=Path('include'),
                         help='Directory where generated params.h is written.')
-    parser.add_argument('--input-h', type=int, default=28,
+    parser.add_argument('--input_h', type=int, default=28,
                         help='Input image height used to infer network dimensions.')
-    parser.add_argument('--input-w', type=int, default=28,
+    parser.add_argument('--input_w', type=int, default=28,
                         help='Input image width used to infer network dimensions.')
-    parser.add_argument('--input-c', type=int, default=1,
+    parser.add_argument('--input_c', type=int, default=1,
                         help='Input channel count used to infer network dimensions.')
-    parser.add_argument('--fxp-frac-bits', type=int, default=16,
+    parser.add_argument('--fxp_frac_bits', type=int, default=16,
                         help='Number of fractional bits for fixed-point scale conversion.')
     args = parser.parse_args()
 
