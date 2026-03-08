@@ -90,8 +90,8 @@ From the project root, generate C source and header files from the quantized che
 ```bash
 python3 scripts/generate_params.py \
   --path models/quantized.pt \
-  --output-dir src \
-  --header-dir include
+  --output_dir src \
+  --header_dir include
 ```
 
 ### 🧪 Evaluation
