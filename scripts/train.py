@@ -131,7 +131,8 @@ def main(args):
                                           transforms.RandomAffine(degrees=0, 
                                                                   translate=(0.25, 0.25), 
                                                                   scale=(0.7, 1.3), shear=10),
-                                          transforms.RandomPerspective(distortion_scale=0.2, p=0.5),
+                                          transforms.RandomPerspective(distortion_scale=0.2, 
+                                                                       p=0.5),
                                           transforms.ColorJitter(brightness=0.5, contrast=0.5),
                                           transforms.RandomInvert(p=0.5),
                                           transforms.GaussianBlur(kernel_size=3),
@@ -191,23 +192,23 @@ if __name__ == '__main__':
         description="Train a Convolutional Neural Network (CNN) on the MNIST dataset.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     
-    parser.add_argument('--num_epochs', type=int, default=50, 
-                        help='Total number of epochs to train the model.')
+    parser.add_argument('--num_epochs', type=int, default=50,
+                        help='Total number of training epochs to run.')
     
-    parser.add_argument('--batch_size', type=int, default=128, 
-                        help='Number of samples per batch during training and evaluation.')
+    parser.add_argument('--batch_size', type=int, default=128,
+                        help='Mini-batch size for training, validation, and test loaders.')
     
-    parser.add_argument('--train_split', type=float, default=0.8, 
-                        help='Ratio of the dataset to be used for training.')
+    parser.add_argument('--train_split', type=float, default=0.8,
+                        help='Fraction of MNIST train split used for training (rest for validation).')
     
     parser.add_argument('--dataset_path', type=Path, default='./data',
-                        help='Path to the directory where the MNIST dataset will be stored.')
+                        help='Directory where MNIST is downloaded/read.')
     
-    parser.add_argument('--model_path', type=Path, default='./models', 
-                        help='Directory where the trained model checkpoint will be saved.')
+    parser.add_argument('--model_path', type=Path, default='./models',
+                        help='Directory where the output model checkpoint is saved.')
     
     parser.add_argument('--num_workers', type=int, default=(multiprocessing.cpu_count() - 1),
-                        help="Number of subprocesses to use for data loading.")
+                        help='Number of DataLoader worker subprocesses.')
     
     args = parser.parse_args()
 

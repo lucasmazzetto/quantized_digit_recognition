@@ -5,6 +5,15 @@ import torch.nn as nn
 class ConvNet(nn.Module):
 
     def __init__(self, h=28, w=28, inputs=1, outputs=10):
+        """
+        @brief Initialize the convolutional network architecture.
+
+        @param h Input image height.
+        @param w Input image width.
+        @param inputs Number of input channels.
+        @param outputs Number of output classes.
+        @return None.
+        """
         super(ConvNet, self).__init__()
 
         self.convolutional_layers = nn.Sequential(
@@ -52,8 +61,14 @@ class ConvNet(nn.Module):
         
         # Get the total number of elements in x
         return x.numel()
-    
+
     def forward(self, x):
+        """
+        @brief Run a forward pass through the network.
+
+        @param x Input tensor with shape (N, C, H, W).
+        @return Output logits tensor with shape (N, outputs).
+        """
         x = self.convolutional_layers(x)
         x = x.view(x.size(0), -1)
         return self.linear_layers(x)

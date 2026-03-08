@@ -260,6 +260,10 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
+# Project artifacts and generated model/data files
+data/*
+models/*
+
 # pytype static type analyzer
 .pytype/
 
