@@ -1,32 +1,32 @@
 #include "params.h"
 
-const int layer_1_input_scale = 8323072;
+const int layer_1_input_scale = 8355840;
 
-const int layer_1_input_scale_inv = 516;
+const int layer_1_input_scale_inv = 514;
 
 const int layer_1_weight_scale_inv[6] = {138, 191, 248, 164, 177, 170};
 
-const int layer_2_input_scale = 1610142;
+const int layer_2_input_scale = 1783704;
 
-const int layer_2_input_scale_inv = 2667;
+const int layer_2_input_scale_inv = 2408;
 
 const int layer_2_weight_scale_inv[16] = {286, 387, 235, 222, 284, 444, 187, 346, 192, 475, 318, 275, 344, 277, 427, 223};
 
-const int layer_3_input_scale = 765466;
+const int layer_3_input_scale = 886175;
 
-const int layer_3_input_scale_inv = 5611;
+const int layer_3_input_scale_inv = 4847;
 
 const int layer_3_weight_scale_inv[120] = {304, 271, 425, 49, 301, 301, 447, 660, 49, 254, 65, 52, 327, 236, 44, 504, 437, 568, 379, 43, 341, 52, 49, 313, 371, 259, 276, 46, 300, 250, 440, 257, 276, 234, 51, 614, 52, 223, 311, 472, 59, 293, 362, 47, 286, 285, 375, 344, 293, 362, 351, 454, 39, 345, 552, 267, 41, 295, 554, 242, 414, 54, 337, 426, 357, 273, 391, 327, 309, 249, 51, 264, 461, 44, 66, 314, 713, 230, 356, 295, 39, 473, 283, 66, 57, 50, 263, 289, 327, 245, 47, 324, 314, 391, 389, 329, 269, 669, 216, 266, 46, 375, 59, 241, 49, 71, 391, 56, 374, 97, 299, 55, 104, 43, 374, 446, 301, 591, 421, 388};
 
-const int layer_4_input_scale = 313008;
+const int layer_4_input_scale = 398246;
 
-const int layer_4_input_scale_inv = 13722;
+const int layer_4_input_scale_inv = 10785;
 
 const int layer_4_weight_scale_inv[84] = {399, 234, 273, 287, 229, 287, 268, 247, 191, 430, 70, 78, 71, 248, 230, 196, 253, 218, 80, 275, 265, 323, 275, 261, 206, 279, 286, 254, 294, 215, 330, 204, 325, 274, 274, 194, 265, 284, 239, 266, 235, 78, 200, 79, 292, 222, 273, 256, 293, 296, 228, 288, 225, 483, 193, 313, 96, 280, 249, 218, 344, 259, 302, 73, 259, 236, 223, 225, 342, 271, 222, 247, 261, 282, 242, 275, 224, 276, 200, 260, 99, 329, 233, 408};
 
-const int layer_5_input_scale = 333624;
+const int layer_5_input_scale = 420313;
 
-const int layer_5_input_scale_inv = 12874;
+const int layer_5_input_scale_inv = 10218;
 
 const int layer_5_weight_scale_inv[10] = {355, 359, 280, 231, 312, 299, 314, 310, 293, 286};
 
