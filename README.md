@@ -19,7 +19,6 @@ source .venv/bin/activate
 python -m pip install --upgrade pip
 
 pip install --index-url https://pypi.org/simple \
-  --extra-index-url https://pypi.nvidia.com \
   -r requirements.txt
 ```
 
@@ -72,16 +71,26 @@ python3 scripts/train.py \
 
 ### ⚖️ Model Quantization
 
-From the project root, run post-training quantization to convert the trained floating-point checkpoint into quantized weights and scaling constants used by the C inference pipeline:
+From the project root, run post-training quantization to convert the trained
+floating-point checkpoint into quantized weights and scaling constants used by
+the C inference pipeline.
 
 ```bash
 python3 scripts/quantize.py \
   --filename model.pt \
+  --calibrator histogram_observer \
+  --num_bins 128 \
   --save_dir ./models \
   --data_dir ./data
 ```
 
-This step creates `models/quantized.pt`, which is the input for C parameter generation.
+Available calibration methods:
+
+- `histogram_observer`: uses PyTorch `HistogramObserver`.
+- `kl_entropy`: uses a custom histogram + KL-divergence threshold search.
+
+This step creates `models/quantized.pt`, which is the input for C parameter
+generation.
 
 ### 🧩 Generate C Parameters
 
@@ -113,3 +122,23 @@ After building the shared library, run the evaluation script from the project ro
 ```bash
 python3 scripts/eval.py
 ```
+
+### 🖼️ Visualization
+
+Use this step to compare intermediate feature maps from the original Python model and the quantized C model side by side.
+
+From the project root:
+
+```bash
+python3 scripts/extract_feature_maps.py \
+  --lib_path ./lib/convnet.so \
+  --params_header ./include/params.h \
+  --float_model ./models/model.pt \
+  --data_dir ./data \
+  --images_dir ./images \
+  --input_frac_bits 16 \
+  --output_frac_bits 16
+```
+
+This script saves one image per label (`0` to `9`) as:
+`images/feature_maps_0.png`, ..., `images/feature_maps_9.png`.
