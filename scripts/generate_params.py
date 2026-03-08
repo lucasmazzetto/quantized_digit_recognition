@@ -174,6 +174,7 @@ def write_header_file(path: Path, state_dict, layer_indices, dims: dict):
             sw_inv = np.atleast_1d(to_numpy(state_dict[f'layer_{layer_idx}_s_w_inv']))
             f.write(f'extern const int layer_{layer_idx}_weight_scale_inv[{sw_inv.size}];\n')
 
+        f.write('\n')
         f.write('// layer quantized parameters\n')
         for layer_idx in layer_indices:
             weight = to_numpy(state_dict[f'layer_{layer_idx}_weight'])

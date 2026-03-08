@@ -37,6 +37,7 @@ extern const int layer_4_weight_scale_inv[84];
 extern const int layer_5_input_scale;
 extern const int layer_5_input_scale_inv;
 extern const int layer_5_weight_scale_inv[10];
+
 // layer quantized parameters
 extern const int8_t layer_1_weight[150];
 extern const int8_t layer_2_weight[2400];
