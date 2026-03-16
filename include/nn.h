@@ -32,21 +32,25 @@ void pooling2d(int *input, int *output, int batch_size, int output_channels, int
                int kernel_width, int stride_height, int stride_width);
 
 /**
- * @brief Calculates argmax per row of a batch_sizexoutput_features matrix.
+ * @brief Computes argmax along columns for each row of a flattened matrix.
  *
- * @param matrix_in The batch_sizexoutput_features input matrix.
- * @param indices The output indices.
- * @param batch_size The number of rows.
- * @param output_features The number of columns.
+ * Interprets `matrix_in` as row-major [batch_size, output_features]. For each
+ * row `n`, stores in `indices[n]` the column index `m` with the maximum value.
+ * If multiple columns share the maximum, the first one is kept.
+ *
+ * @param matrix_in Input matrix flattened in row-major order.
+ * @param indices Output array of length `batch_size` with argmax column indices.
+ * @param batch_size Number of matrix rows.
+ * @param output_features Number of columns per row. Must be greater than zero.
  */
-void argmax_over_cols(const int *matrix_in, unsigned int *indices,
-                      const unsigned int batch_size, const unsigned int output_features);
+void argmax_per_row(const int *matrix_in, unsigned int *indices,
+                    const unsigned int batch_size, const unsigned int output_features);
 
 /**
  * @brief Runs a linear neural-network layer without bias.
  *
  * Input is quantized before multiplication with weights and then dequantized
- * per-row before optional activation.
+ * per-column before optional activation.
  *
  * @param input The batch_sizexinput_features input matrix.
  * @param weights The input_featuresxoutput_features layer weight matrix.

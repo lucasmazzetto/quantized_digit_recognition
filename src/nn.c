@@ -287,7 +287,7 @@ static void quantize(const int *tensor_inout, int8_t *tensor_q, const int scale_
  * @param batch_size Number of rows in the output matrix.
  * @param output_features Number of output features (columns).
  */
-static void dequantize_per_row(int *matrix_inout, const int *scale_factor_w_inv,
+static void dequantize_per_col(int *matrix_inout, const int *scale_factor_w_inv,
                                const int scale_factor_x_inv, const unsigned int batch_size,
                                const unsigned int output_features)
 {
@@ -354,8 +354,20 @@ static void dequantize_per_channel(int *tensor_inout, const int *weight_scale_in
     }
 }
 
-void argmax_over_cols(const int *matrix_in, unsigned int *indices,
-                      const unsigned int batch_size, const unsigned int output_features)
+/**
+ * @brief Computes argmax along columns for each row of a flattened matrix.
+ *
+ * Interprets `matrix_in` as row-major [batch_size, output_features]. For each
+ * row `n`, stores in `indices[n]` the column index `m` with the maximum value.
+ * If multiple columns share the maximum, the first one is kept.
+ *
+ * @param matrix_in Input matrix flattened in row-major order.
+ * @param indices Output array of length `batch_size` with argmax column indices.
+ * @param batch_size Number of matrix rows.
+ * @param output_features Number of columns per row. Must be greater than zero.
+ */
+void argmax_per_row(const int *matrix_in, unsigned int *indices,
+                    const unsigned int batch_size, const unsigned int output_features)
 {
     unsigned int n, m, max_idx;
     int row_max, value;
@@ -392,7 +404,7 @@ void linear_layer(const int *input, const int8_t *weights, int *output, const in
     mat_mult(input_quantized, weights, output, batch_size, input_features, output_features);
 
     // Bring accumulators back to Q16 for the next layer
-    dequantize_per_row(output, weight_scale_inv, input_scale_inv, batch_size, output_features);
+    dequantize_per_col(output, weight_scale_inv, input_scale_inv, batch_size, output_features);
 
     if (apply_relu) {
         relu(output, batch_size * output_features);
