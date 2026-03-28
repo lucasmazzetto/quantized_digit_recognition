@@ -1,4 +1,4 @@
-# STM32 Digit Recognition
+# Quantized Digit Recognition
 
 This project trains a CNN for digit recognition and exports quantized parameters for C inference.
 
