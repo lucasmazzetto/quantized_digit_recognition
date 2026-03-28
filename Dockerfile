@@ -18,4 +18,4 @@ RUN apt-get update && \
 
 COPY . /app/neural_network
 
-CMD ["python", "train.py"]
+CMD ["bash"]
