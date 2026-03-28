@@ -17,7 +17,7 @@
  * @param input The input tensor.
  * @param output The output tensor.
  * @param batch_size The number of samples.
- * @param output_channels The number of channels.
+ * @param channels The number of channels (pooling preserves channel count).
  * @param input_height The input height.
  * @param input_width The input width.
  * @param output_height The output height.
@@ -27,7 +27,7 @@
  * @param stride_height The height stride.
  * @param stride_width The width stride.
  */
-void pooling2d(int *input, int *output, int batch_size, int output_channels, int input_height,
+void pooling2d(int *input, int *output, int batch_size, int channels, int input_height,
                int input_width, int output_height, int output_width, int kernel_height,
                int kernel_width, int stride_height, int stride_width);
 
@@ -52,11 +52,11 @@ void argmax_per_row(const int *matrix_in, unsigned int *indices,
  * Input is quantized before multiplication with weights and then dequantized
  * per-column before optional activation.
  *
- * @param input The batch_sizexinput_features input matrix.
- * @param weights The input_featuresxoutput_features layer weight matrix.
- * @param output The batch_sizexoutput_features output matrix.
+ * @param input The [batch_size x input_features] input matrix.
+ * @param weights The [input_features x output_features] layer weight matrix.
+ * @param output The [batch_size x output_features] output matrix.
  * @param input_scale The scale factor for input quantization.
- * @param weight_scale_inv The 1xoutput_features inverse scale vector for weights.
+ * @param weight_scale_inv The [1 x output_features] inverse scale vector for weights.
  * @param input_scale_inv The inverse input scale factor.
  * @param batch_size The batch size.
  * @param input_features The input feature size.
