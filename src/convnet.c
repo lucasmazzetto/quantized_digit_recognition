@@ -56,5 +56,5 @@ void run_convnet(const int *input, unsigned int *class_indices)
     int output[BATCH_SIZE * OUTPUT_DIM];
 
     convnet_forward(input, conv1_out, pool1_out, conv2_out, pool2_out,
-                           linear1_out, linear2_out, output, class_indices);
+                    linear1_out, linear2_out, output, class_indices);
 }
