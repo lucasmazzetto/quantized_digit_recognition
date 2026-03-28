@@ -209,6 +209,107 @@ def collect_amax_kl_entropy(model: nn.Module, data_loader: DataLoader,
     return activation_amax
 
 
+def collect_amax_max_value(model: nn.Module, data_loader: DataLoader,
+                           layer_modules: dict):
+    """
+    @brief Collects activation amax values using max-value calibration.
+
+    @param model Model used for calibration.
+    @param data_loader Calibration data loader.
+    @param layer_modules Mapping layer index -> module.
+    @return Mapping layer index -> activation amax.
+    """
+    layer_max = {layer_idx: 0.0 for layer_idx in layer_modules}
+
+    def collect_max(layer_idx: int, tensor: torch.Tensor):
+        current_max = float(tensor.abs().max().item())
+        if current_max > layer_max[layer_idx]:
+            layer_max[layer_idx] = current_max
+
+    run_calibration_pass(model, data_loader, layer_modules, collect_max)
+
+    return {layer_idx: max(max_abs, 1e-12) for layer_idx, max_abs in layer_max.items()}
+
+
+def compute_percentile_amax_from_histogram(histogram: np.ndarray, max_abs: float,
+                                           percentile: float):
+    """
+    @brief Computes amax from an absolute-value histogram percentile threshold.
+
+    @param histogram Absolute-value histogram counts.
+    @param max_abs Maximum absolute value represented by the histogram.
+    @param percentile Percentile in (0, 100].
+    @return Estimated amax threshold.
+    """
+    if max_abs <= 0.0:
+        return 1e-12
+
+    hist = histogram.astype(np.float64)
+    total = np.sum(hist)
+
+    if total <= 0.0:
+        return max_abs
+
+    pct = float(np.clip(percentile, 1e-6, 100.0))
+    target = (pct / 100.0) * total
+    cdf = np.cumsum(hist)
+    threshold_bin = int(np.searchsorted(cdf, target, side='left'))
+    threshold_bin = min(max(threshold_bin, 0), hist.shape[0] - 1)
+
+    # Convert selected bin index to its upper-edge value in [0, max_abs]
+    return max_abs * (float(threshold_bin + 1) / float(hist.shape[0]))
+
+
+def collect_amax_percentile(model: nn.Module, data_loader: DataLoader,
+                            layer_modules: dict, num_bins: int, percentile: float):
+    """
+    @brief Collects activation amax values using percentile calibration.
+
+    @param model Model used for calibration.
+    @param data_loader Calibration data loader.
+    @param layer_modules Mapping layer index -> module.
+    @param num_bins Number of bins in calibration histograms.
+    @param percentile Percentile used to choose clipping threshold.
+    @return Mapping layer index -> activation amax.
+    """
+    # Collect max abs for stable histogram ranges
+    layer_max = {layer_idx: 0.0 for layer_idx in layer_modules}
+
+    def collect_max(layer_idx: int, tensor: torch.Tensor):
+        current_max = float(tensor.abs().max().item())
+        if current_max > layer_max[layer_idx]:
+            layer_max[layer_idx] = current_max
+
+    run_calibration_pass(model, data_loader, layer_modules, collect_max)
+
+    # Collect absolute-value histograms with fixed [0, max_abs] ranges
+    layer_hists = {layer_idx: np.zeros(num_bins, dtype=np.float64) for layer_idx in layer_modules}
+
+    def collect_hist(layer_idx: int, tensor: torch.Tensor):
+        max_abs = layer_max[layer_idx]
+        if max_abs <= 0.0:
+            return
+
+        abs_tensor = tensor.abs().cpu().flatten()
+        hist = torch.histc(abs_tensor, bins=num_bins, min=0.0, max=max_abs)
+        layer_hists[layer_idx] += hist.numpy().astype(np.float64)
+
+    run_calibration_pass(model, data_loader, layer_modules, collect_hist)
+
+    activation_amax = {}
+
+    for layer_idx in layer_modules:
+        max_abs = layer_max[layer_idx]
+        if max_abs <= 0.0:
+            activation_amax[layer_idx] = 1e-12
+            continue
+
+        activation_amax[layer_idx] = max(compute_percentile_amax_from_histogram(
+            layer_hists[layer_idx], max_abs, percentile), 1e-12)
+
+    return activation_amax
+
+
 def compute_weight_amax(weight: torch.Tensor):
     """
     @brief Computes per-output-channel amax for conv/linear weights.
@@ -274,7 +375,7 @@ def build_calibration_loader(data_dir: Path):
 
 
 def calibrate_activation_amax(model: nn.Module, data_loader: DataLoader,
-                              calibrator: str, num_bins: int):
+                              calibrator: str, num_bins: int, percentile: float):
     """
     @brief Calibrates activation amax values with a selected calibrator.
 
@@ -282,6 +383,7 @@ def calibrate_activation_amax(model: nn.Module, data_loader: DataLoader,
     @param data_loader Calibration data loader.
     @param calibrator Selected calibrator method.
     @param num_bins Number of histogram bins.
+    @param percentile Percentile used by percentile calibrator.
     @return Mapping layer index -> activation amax.
     """
     layer_modules = {}
@@ -295,6 +397,12 @@ def calibrate_activation_amax(model: nn.Module, data_loader: DataLoader,
 
     if calibrator == 'kl_entropy':
         return collect_amax_kl_entropy(model, data_loader, layer_modules, num_bins)
+
+    if calibrator == 'max_value':
+        return collect_amax_max_value(model, data_loader, layer_modules)
+
+    if calibrator == 'percentile':
+        return collect_amax_percentile(model, data_loader, layer_modules, num_bins, percentile)
 
     raise ValueError(f'Unsupported calibrator: {calibrator}')
 
@@ -311,9 +419,12 @@ if __name__ == '__main__':
                         help='Number of bins used for histogram-based calibration.')
     
     parser.add_argument('--calibrator', type=str,
-                        choices=['histogram_observer', 'kl_entropy'],
+                        choices=['histogram_observer', 'kl_entropy', 'max_value', 'percentile'],
                         default='histogram_observer',
                         help='Calibration strategy used to estimate activation amax.')
+
+    parser.add_argument('--percentile', type=float, default=99.9,
+                        help='Percentile used when --calibrator=percentile.')
     
     parser.add_argument('--data_dir', default='./data', type=Path,
                         help='Directory where MNIST is downloaded/read for calibration.')
@@ -335,7 +446,8 @@ if __name__ == '__main__':
     calibration_loader = build_calibration_loader(args.data_dir)
 
     activation_amax = calibrate_activation_amax(model, calibration_loader,
-                                                args.calibrator, args.num_bins)
+                                                args.calibrator, args.num_bins,
+                                                args.percentile)
 
     quantized_state_dict = quantize_model_params(model, activation_amax)
     saved_stats['state_dict'] = quantized_state_dict
