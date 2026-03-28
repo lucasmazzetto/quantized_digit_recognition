@@ -3,6 +3,7 @@ import argparse
 import multiprocessing
 from pathlib import Path
 
+import matplotlib
 import torch
 import torch.nn as nn
 import torchvision.datasets as datasets
@@ -10,6 +11,10 @@ import torchvision.transforms as transforms
 from model import ConvNet
 from torch.optim import Adam
 from torch.utils.data import DataLoader, random_split
+
+# Use a non-interactive backend so plots can be generated in headless environments
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
 
 def train_epoch(model:nn.Module, data_loader: DataLoader, 
@@ -75,7 +80,8 @@ def eval_epoch(model: nn.Module, data_loader: DataLoader, loss_fn: nn.CrossEntro
 
 
 def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, 
-          optimizer: Adam, loss_fn: nn.CrossEntropyLoss, num_epochs: int):
+          optimizer: Adam, loss_fn: nn.CrossEntropyLoss, num_epochs: int,
+          plot_path: Path):
     """
     @brief Runs the training loop for a specified number of epochs.
 
@@ -85,14 +91,50 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader,
     @param optimizer The optimizer used to update model parameters.
     @param loss_fn The loss function used to compute the loss.
     @param num_epochs The number of epochs to train the model.
+    @param plot_path Output path used to refresh the training loss plot every epoch.
+    @return Lists containing train and validation loss per epoch.
     """
     print(f'Starting training for {num_epochs} epochs...')
+
+    train_losses = []
+    val_losses = []
     
     for epoch in range(num_epochs):
         train_loss = train_epoch(model, train_loader, optimizer, loss_fn)
         val_loss = eval_epoch(model, val_loader, loss_fn)
+        train_losses.append(train_loss)
+        val_losses.append(val_loss)
+
+        # Update training.png at each epoch with the curve accumulated so far
+        plot_training_loss(train_losses, val_losses, plot_path)
+
         print(f"Epoch [{epoch + 1}/{num_epochs}] - "
               f"Train Loss: {train_loss:.5f} | Validation Loss: {val_loss:.5f}")
+
+    return train_losses, val_losses
+
+
+def plot_training_loss(train_losses:list, val_losses:list, output_path: Path):
+    """
+    @brief Plots and saves the training/validation loss curves.
+
+    @param train_losses List of train loss values per epoch.
+    @param val_losses List of validation loss values per epoch.
+    @param output_path Output image path for the loss plot.
+    """
+    epochs = range(1, len(train_losses) + 1)
+
+    plt.figure(figsize=(8, 5))
+    plt.plot(epochs, train_losses, label='Train loss', linewidth=2)
+    plt.plot(epochs, val_losses, label='Validation loss', linewidth=2)
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.title('Training and Validation Loss')
+    plt.grid(True, alpha=0.3)
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=180)
+    plt.close()
 
 
 def test(model: nn.Module, test_loader: DataLoader):
@@ -125,13 +167,21 @@ def test(model: nn.Module, test_loader: DataLoader):
 
 
 def main(args):
+    script_dir = Path(__file__).resolve().parent
+    project_root = script_dir.parent
+    images_dir = project_root / 'images'
+
+    # Create images directory to store training curves
+    images_dir.mkdir(parents=True, exist_ok=True)
+
     # Augmentation for training and validation
     train_transform = transforms.Compose([transforms.Grayscale(),
                                           transforms.RandomRotation(30),
                                           transforms.RandomAffine(degrees=0, 
                                                                   translate=(0.25, 0.25), 
                                                                   scale=(0.7, 1.3), shear=10),
-                                          transforms.RandomPerspective(distortion_scale=0.2, p=0.5),
+                                          transforms.RandomPerspective(distortion_scale=0.2, 
+                                                                       p=0.5),
                                           transforms.ColorJitter(brightness=0.5, contrast=0.5),
                                           transforms.RandomInvert(p=0.5),
                                           transforms.GaussianBlur(kernel_size=3),
@@ -174,10 +224,17 @@ def main(args):
                              num_workers=args.num_workers, shuffle=False)
     
     # Execute the training loop
-    train(model, train_loader, val_loader, optimizer, loss_fn, args.num_epochs)
+    train_losses, val_losses = train(model, train_loader, val_loader, optimizer,
+                                     loss_fn, args.num_epochs,
+                                     images_dir / 'training.png')
+
+    # Save training history figure in images/training.png
+    plot_training_loss(train_losses, val_losses, images_dir / 'training.png')
 
     # Evaluate the model on the test set
     test(model, test_loader)
+
+    os.makedirs(args.model_path, exist_ok=True)
     
     # Save the trained model, optimizer state, and epoch count
     torch.save({'state_dict': model.state_dict(),
@@ -191,23 +248,23 @@ if __name__ == '__main__':
         description="Train a Convolutional Neural Network (CNN) on the MNIST dataset.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     
-    parser.add_argument('--num_epochs', type=int, default=50, 
-                        help='Total number of epochs to train the model.')
+    parser.add_argument('--num_epochs', type=int, default=50,
+                        help='Total number of training epochs to run.')
     
-    parser.add_argument('--batch_size', type=int, default=128, 
-                        help='Number of samples per batch during training and evaluation.')
+    parser.add_argument('--batch_size', type=int, default=128,
+                        help='Mini-batch size for training, validation, and test loaders.')
     
-    parser.add_argument('--train_split', type=float, default=0.8, 
-                        help='Ratio of the dataset to be used for training.')
+    parser.add_argument('--train_split', type=float, default=0.8,
+                        help='Fraction of MNIST train split used for training (rest for validation).')
     
     parser.add_argument('--dataset_path', type=Path, default='./data',
-                        help='Path to the directory where the MNIST dataset will be stored.')
+                        help='Directory where MNIST is downloaded/read.')
     
-    parser.add_argument('--model_path', type=Path, default='./models', 
-                        help='Directory where the trained model checkpoint will be saved.')
+    parser.add_argument('--model_path', type=Path, default='./models',
+                        help='Directory where the output model checkpoint is saved.')
     
     parser.add_argument('--num_workers', type=int, default=(multiprocessing.cpu_count() - 1),
-                        help="Number of subprocesses to use for data loading.")
+                        help='Number of DataLoader worker subprocesses.')
     
     args = parser.parse_args()
 
