@@ -42,7 +42,7 @@ void convnet_forward(const int *input, int *conv1_out, int *pool1_out,
                  layer_5_input_scale_inv, BATCH_SIZE, LINEAR2_OUT_FEATURES, OUTPUT_DIM, 0);
 
     // final class index from logits
-    argmax_over_cols(output, class_indices, BATCH_SIZE, OUTPUT_DIM);
+    argmax_per_row(output, class_indices, BATCH_SIZE, OUTPUT_DIM);
 }
 
 void run_convnet(const int *input, unsigned int *class_indices)
