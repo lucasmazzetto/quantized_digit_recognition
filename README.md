@@ -80,6 +80,7 @@ python3 scripts/quantize.py \
   --filename model.pt \
   --calibrator histogram_observer \
   --num_bins 128 \
+  --percentile 99.9 \
   --save_dir ./models \
   --data_dir ./data
 ```
@@ -88,6 +89,13 @@ Available calibration methods:
 
 - `histogram_observer`: uses PyTorch `HistogramObserver`.
 - `kl_entropy`: uses a custom histogram + KL-divergence threshold search.
+- `max_value`: uses the maximum absolute activation value.
+- `percentile`: uses a histogram percentile threshold (`--percentile`).
+
+Notes:
+
+- `--num_bins` is used by histogram-based calibrators.
+- `--percentile` is used when `--calibrator percentile` is selected.
 
 This step creates `models/quantized.pt`, which is the input for C parameter
 generation.
