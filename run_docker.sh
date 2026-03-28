@@ -2,8 +2,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-IMAGE_NAME="${IMAGE_NAME:-stm32_digit_recognition_nn:dev}"
-CONTAINER_NAME="${CONTAINER_NAME:-stm32_digit_recognition_nn_dev}"
+IMAGE_NAME="${IMAGE_NAME:-quantized_digit_recognition:dev}"
+CONTAINER_NAME="${CONTAINER_NAME:-quantized_digit_recognition_dev}"
 HOST_UID="${HOST_UID:-$(id -u)}"
 HOST_GID="${HOST_GID:-$(id -g)}"
 HOST_USER="${HOST_USER:-$(id -un)}"
