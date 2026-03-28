@@ -9,7 +9,7 @@
  * @brief Runs the pre-defined convolutional neural network.
  *
  * @param input The input tensor.
- * @param class_indices The batch_sizex1 vector storing predicted class indices.
+ * @param class_indices The [batch_size x 1] vector storing predicted class indices.
  */
 void run_convnet(const int *input, unsigned int *class_indices);
 
@@ -24,7 +24,7 @@ void run_convnet(const int *input, unsigned int *class_indices);
  * @param linear1_out The first linear layer output buffer.
  * @param linear2_out The second linear layer output buffer.
  * @param output The final logits/output buffer.
- * @param class_indices The batch_sizex1 vector storing predicted class indices.
+ * @param class_indices The [batch_size x 1] vector storing predicted class indices.
  */
 void convnet_forward(const int *input, int *conv1_out, int *pool1_out,
                      int *conv2_out, int *pool2_out, int *linear1_out,

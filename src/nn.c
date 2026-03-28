@@ -185,7 +185,7 @@ static void conv2d(const int8_t *input, const int8_t *weights, int *output, int 
     }
 }
 
-void pooling2d(int *input, int *output, int batch_size, int output_channels, int input_height,
+void pooling2d(int *input, int *output, int batch_size, int channels, int input_height,
                int input_width, int output_height, int output_width, int kernel_height,
                int kernel_width, int stride_height, int stride_width)
 {
@@ -198,10 +198,10 @@ void pooling2d(int *input, int *output, int batch_size, int output_channels, int
 
     for (batch_idx = 0; batch_idx < batch_size; batch_idx++) {
         // Base offsets for the current sample in flattened tensors
-        int batch_idx_output = batch_idx * output_channels * output_height * output_width;
-        int batch_idx_input = batch_idx * output_channels * input_height * input_width;
+        int batch_idx_output = batch_idx * channels * output_height * output_width;
+        int batch_idx_input = batch_idx * channels * input_height * input_width;
 
-        for (out_channel_idx = 0; out_channel_idx < output_channels; out_channel_idx++) {
+        for (out_channel_idx = 0; out_channel_idx < channels; out_channel_idx++) {
             int out_channel_idx_output = out_channel_idx * output_height * output_width;
             int out_channel_idx_input = out_channel_idx * input_height * input_width;
 
@@ -320,12 +320,12 @@ static void dequantize_per_col(int *matrix_inout, const int *scale_factor_w_inv,
  * @param input_scale_inv Inverse input activation scale.
  * @param batch_size Number of input samples.
  * @param output_channels Number of output channels.
- * @param input_features Flattened spatial size per channel.
+ * @param output_size Flattened output spatial size per channel.
  */
 static void dequantize_per_channel(int *tensor_inout, const int *weight_scale_inv,
                                    const int input_scale_inv, const unsigned int batch_size,
                                    const unsigned int output_channels,
-                                   const unsigned int input_features)
+                                   const unsigned int output_size)
 {
     unsigned int k, n, c;
     int64_t out_value_q32;
@@ -335,13 +335,13 @@ static void dequantize_per_channel(int *tensor_inout, const int *weight_scale_in
             // This scale is constant across all features of the same output channel
             out_value_q32 = (int64_t)weight_scale_inv[c] * (int64_t)input_scale_inv;
 
-            for (k = 0; k < input_features; k++) {
+            for (k = 0; k < output_size; k++) {
                 unsigned int tensor_idx;
                 int64_t scaled_value_q32;
                 int64_t scaled_value_q16;
 
                 // Flatten (n, c, k) into one index for the contiguous tensor buffer
-                tensor_idx = n * output_channels * input_features + c * input_features + k;
+                tensor_idx = n * output_channels * output_size + c * output_size + k;
 
                 scaled_value_q32 = out_value_q32 * (int64_t)tensor_inout[tensor_idx];
 
