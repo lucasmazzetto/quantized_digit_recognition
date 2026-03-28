@@ -233,6 +233,9 @@ def main(args):
 
     # Evaluate the model on the test set
     test(model, test_loader)
+
+    if not os.path.isdir(args.model_path):
+        os.mkdir(args.model_path)
     
     # Save the trained model, optimizer state, and epoch count
     torch.save({'state_dict': model.state_dict(),
