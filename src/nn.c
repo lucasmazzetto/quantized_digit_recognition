@@ -354,18 +354,6 @@ static void dequantize_per_channel(int *tensor_inout, const int *weight_scale_in
     }
 }
 
-/**
- * @brief Computes argmax along columns for each row of a flattened matrix.
- *
- * Interprets `matrix_in` as row-major [batch_size, output_features]. For each
- * row `n`, stores in `indices[n]` the column index `m` with the maximum value.
- * If multiple columns share the maximum, the first one is kept.
- *
- * @param matrix_in Input matrix flattened in row-major order.
- * @param indices Output array of length `batch_size` with argmax column indices.
- * @param batch_size Number of matrix rows.
- * @param output_features Number of columns per row. Must be greater than zero.
- */
 void argmax_per_row(const int *matrix_in, unsigned int *indices,
                     const unsigned int batch_size, const unsigned int output_features)
 {
