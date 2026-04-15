@@ -20,7 +20,7 @@ def get_quantized_layers(model: nn.Module):
     @param model Trained floating-point model.
     @return Ordered list of tuples with layer index, layer type, and module reference.
     """
-    # Layer indices must match the C-side layer_1..layer_5 naming convention
+    # Layer indices must match the checkpoint key pattern layer_1..layer_5
     return [(1, 'conv', model.convolutional_layers[0]),
             (2, 'conv', model.convolutional_layers[3]),
             (3, 'linear', model.linear_layers[0]),

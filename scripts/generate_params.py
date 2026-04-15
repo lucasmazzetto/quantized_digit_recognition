@@ -5,6 +5,14 @@ from pathlib import Path
 import numpy as np
 import torch
 
+LAYER_PREFIX_BY_INDEX = {
+    1: "conv_1",
+    2: "conv_2",
+    3: "linear_1",
+    4: "linear_2",
+    5: "linear_3",
+}
+
 
 def conv_output_dim(input_dim: int, kernel_size: int, stride: int):
     """
@@ -71,6 +79,19 @@ def get_layer_indices(state_dict):
     return sorted(indices)
 
 
+def get_layer_prefix(layer_idx: int) -> str:
+    """
+    @brief Returns the generated C symbol prefix for a given layer index.
+
+    @param layer_idx Layer index from the quantized checkpoint.
+    @return C symbol prefix used in params.h/params.c.
+    """
+    if layer_idx not in LAYER_PREFIX_BY_INDEX:
+        raise KeyError(f"Unsupported layer index for export symbols: {layer_idx}")
+
+    return LAYER_PREFIX_BY_INDEX[layer_idx]
+
+
 def infer_dimensions(state_dict, input_h: int, input_w: int, input_c: int):
     """
     @brief Infer all model dimensions from quantized weights and input shape.
@@ -117,18 +138,18 @@ def infer_dimensions(state_dict, input_h: int, input_w: int, input_c: int):
     return {'INPUT_HEIGHT': input_h,
             'INPUT_WIDTH': input_w,
             'INPUT_CHANNELS': input_c,
-            'CONV1_OUT_HEIGHT': h1_conv,
-            'CONV1_OUT_WIDTH': w1_conv,
-            'POOL1_OUT_HEIGHT': h1_pool,
-            'POOL1_OUT_WIDTH': w1_pool,
-            'CONV2_OUT_HEIGHT': h2_conv,
-            'CONV2_OUT_WIDTH': w2_conv,
-            'POOL2_OUT_HEIGHT': h2_pool,
-            'POOL2_OUT_WIDTH': w2_pool,
-            'CONV1_OUT_CHANNELS': c1,
-            'CONV2_OUT_CHANNELS': c2,
-            'LINEAR1_OUT_FEATURES': s1_linear,
-            'LINEAR2_OUT_FEATURES': s2_linear,
+            'CONV_1_OUT_HEIGHT': h1_conv,
+            'CONV_1_OUT_WIDTH': w1_conv,
+            'POOL_1_OUT_HEIGHT': h1_pool,
+            'POOL_1_OUT_WIDTH': w1_pool,
+            'CONV_2_OUT_HEIGHT': h2_conv,
+            'CONV_2_OUT_WIDTH': w2_conv,
+            'POOL_2_OUT_HEIGHT': h2_pool,
+            'POOL_2_OUT_WIDTH': w2_pool,
+            'CONV_1_OUT_CHANNELS': c1,
+            'CONV_2_OUT_CHANNELS': c2,
+            'LINEAR_1_OUT_FEATURES': s1_linear,
+            'LINEAR_2_OUT_FEATURES': s2_linear,
             'OUTPUT_DIM': output_dim}
 
 
@@ -149,35 +170,38 @@ def write_header_file(path: Path, state_dict, layer_indices, dims: dict):
         )
         f.write(f"#define INPUT_HEIGHT {dims['INPUT_HEIGHT']}\n")
         f.write(f"#define INPUT_WIDTH {dims['INPUT_WIDTH']}\n")
-        f.write(f"#define CONV1_OUT_HEIGHT {dims['CONV1_OUT_HEIGHT']}\n")
-        f.write(f"#define CONV1_OUT_WIDTH {dims['CONV1_OUT_WIDTH']}\n")
-        f.write(f"#define POOL1_OUT_HEIGHT {dims['POOL1_OUT_HEIGHT']}\n")
-        f.write(f"#define POOL1_OUT_WIDTH {dims['POOL1_OUT_WIDTH']}\n")
-        f.write(f"#define CONV2_OUT_HEIGHT {dims['CONV2_OUT_HEIGHT']}\n")
-        f.write(f"#define CONV2_OUT_WIDTH {dims['CONV2_OUT_WIDTH']}\n")
-        f.write(f"#define POOL2_OUT_HEIGHT {dims['POOL2_OUT_HEIGHT']}\n")
-        f.write(f"#define POOL2_OUT_WIDTH {dims['POOL2_OUT_WIDTH']}\n")
+        f.write(f"#define CONV_1_OUT_HEIGHT {dims['CONV_1_OUT_HEIGHT']}\n")
+        f.write(f"#define CONV_1_OUT_WIDTH {dims['CONV_1_OUT_WIDTH']}\n")
+        f.write(f"#define POOL_1_OUT_HEIGHT {dims['POOL_1_OUT_HEIGHT']}\n")
+        f.write(f"#define POOL_1_OUT_WIDTH {dims['POOL_1_OUT_WIDTH']}\n")
+        f.write(f"#define CONV_2_OUT_HEIGHT {dims['CONV_2_OUT_HEIGHT']}\n")
+        f.write(f"#define CONV_2_OUT_WIDTH {dims['CONV_2_OUT_WIDTH']}\n")
+        f.write(f"#define POOL_2_OUT_HEIGHT {dims['POOL_2_OUT_HEIGHT']}\n")
+        f.write(f"#define POOL_2_OUT_WIDTH {dims['POOL_2_OUT_WIDTH']}\n")
         f.write(f"#define INPUT_CHANNELS {dims['INPUT_CHANNELS']}\n")
-        f.write(f"#define CONV1_OUT_CHANNELS {dims['CONV1_OUT_CHANNELS']}\n")
-        f.write(f"#define CONV2_OUT_CHANNELS {dims['CONV2_OUT_CHANNELS']}\n")
-        f.write(f"#define LINEAR1_OUT_FEATURES {dims['LINEAR1_OUT_FEATURES']}\n")
-        f.write(f"#define LINEAR2_OUT_FEATURES {dims['LINEAR2_OUT_FEATURES']}\n")
+        f.write(f"#define CONV_1_OUT_CHANNELS {dims['CONV_1_OUT_CHANNELS']}\n")
+        f.write(f"#define CONV_2_OUT_CHANNELS {dims['CONV_2_OUT_CHANNELS']}\n")
+        f.write(f"#define LINEAR_1_OUT_FEATURES {dims['LINEAR_1_OUT_FEATURES']}\n")
+        f.write(f"#define LINEAR_2_OUT_FEATURES {dims['LINEAR_2_OUT_FEATURES']}\n")
         f.write(f"#define OUTPUT_DIM {dims['OUTPUT_DIM']}\n\n")
         f.write('#include <stdint.h>\n\n')
 
         f.write('// quantization/dequantization constants\n')
         for layer_idx in layer_indices:
-            f.write(f'extern const int layer_{layer_idx}_input_scale;\n')
-            f.write(f'extern const int layer_{layer_idx}_input_scale_inv;\n')
+            layer_prefix = get_layer_prefix(layer_idx)
+
+            f.write(f'extern const int {layer_prefix}_input_scale;\n')
+            f.write(f'extern const int {layer_prefix}_input_scale_inv;\n')
 
             sw_inv = np.atleast_1d(to_numpy(state_dict[f'layer_{layer_idx}_s_w_inv']))
-            f.write(f'extern const int layer_{layer_idx}_weight_scale_inv[{sw_inv.size}];\n')
+            f.write(f'extern const int {layer_prefix}_weight_scale_inv[{sw_inv.size}];\n')
 
         f.write('\n')
         f.write('// layer quantized parameters\n')
         for layer_idx in layer_indices:
+            layer_prefix = get_layer_prefix(layer_idx)
             weight = to_numpy(state_dict[f'layer_{layer_idx}_weight'])
-            f.write(f'extern const int8_t layer_{layer_idx}_weight[{weight.size}];\n')
+            f.write(f'extern const int8_t {layer_prefix}_weight[{weight.size}];\n')
 
         f.write('\n#endif // PARAMS\n')
 
@@ -195,24 +219,26 @@ def write_source_file(path: Path, state_dict, layer_indices, frac_bits: int):
         f.write('#include "params.h"\n\n')
 
         for layer_idx in layer_indices:
+            layer_prefix = get_layer_prefix(layer_idx)
             sx = scalar_to_fxp(state_dict[f'layer_{layer_idx}_s_x'], frac_bits)
             sx_inv = scalar_to_fxp(state_dict[f'layer_{layer_idx}_s_x_inv'], frac_bits)
             sw_inv = array_to_fxp(state_dict[f'layer_{layer_idx}_s_w_inv'], frac_bits)
 
-            f.write(f'const int layer_{layer_idx}_input_scale = {sx};\n\n')
-            f.write(f'const int layer_{layer_idx}_input_scale_inv = {sx_inv};\n\n')
+            f.write(f'const int {layer_prefix}_input_scale = {sx};\n\n')
+            f.write(f'const int {layer_prefix}_input_scale_inv = {sx_inv};\n\n')
 
             sw_values = ', '.join(str(int(v)) for v in sw_inv.flatten())
             f.write(
-                f'const int layer_{layer_idx}_weight_scale_inv[{sw_inv.size}] = '
+                f'const int {layer_prefix}_weight_scale_inv[{sw_inv.size}] = '
                 f'{{{sw_values}}};\n\n'
             )
 
         for layer_idx in layer_indices:
+            layer_prefix = get_layer_prefix(layer_idx)
             weights = to_numpy(state_dict[f'layer_{layer_idx}_weight']).flatten()
             values = ', '.join(str(int(v)) for v in weights)
             f.write(
-                f'const int8_t layer_{layer_idx}_weight[{weights.size}] = '
+                f'const int8_t {layer_prefix}_weight[{weights.size}] = '
                 f'{{{values}}};\n\n'
             )
 

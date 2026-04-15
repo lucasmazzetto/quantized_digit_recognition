@@ -77,10 +77,10 @@ def load_params_dims(header_path: Path) -> Dict[str, int]:
         if match:
             defines[match.group(1)] = int(match.group(2))
 
-    required = ["CONV1_OUT_CHANNELS", "CONV1_OUT_HEIGHT", "CONV1_OUT_WIDTH",
-                "POOL1_OUT_HEIGHT", "POOL1_OUT_WIDTH", "CONV2_OUT_CHANNELS",
-                "CONV2_OUT_HEIGHT", "CONV2_OUT_WIDTH", "POOL2_OUT_HEIGHT",
-                "POOL2_OUT_WIDTH", "LINEAR1_OUT_FEATURES", "LINEAR2_OUT_FEATURES",
+    required = ["CONV_1_OUT_CHANNELS", "CONV_1_OUT_HEIGHT", "CONV_1_OUT_WIDTH",
+                "POOL_1_OUT_HEIGHT", "POOL_1_OUT_WIDTH", "CONV_2_OUT_CHANNELS",
+                "CONV_2_OUT_HEIGHT", "CONV_2_OUT_WIDTH", "POOL_2_OUT_HEIGHT",
+                "POOL_2_OUT_WIDTH", "LINEAR_1_OUT_FEATURES", "LINEAR_2_OUT_FEATURES",
                 "OUTPUT_DIM"]
 
     missing = [key for key in required if key not in defines]
@@ -179,58 +179,58 @@ def run_c_convnet_forward(sample: torch.Tensor, c_lib, dims: Dict[str, int],
     input_quantized = (sample * (1 << input_frac_bits)).round().to(torch.int32)
     input_flat = ensure_contiguous(input_quantized.flatten().cpu().numpy().astype(np.intc))
 
-    conv1_size = dims["CONV1_OUT_CHANNELS"] * dims["CONV1_OUT_HEIGHT"] * dims["CONV1_OUT_WIDTH"]
-    pool1_size = dims["CONV1_OUT_CHANNELS"] * dims["POOL1_OUT_HEIGHT"] * dims["POOL1_OUT_WIDTH"]
-    conv2_size = dims["CONV2_OUT_CHANNELS"] * dims["CONV2_OUT_HEIGHT"] * dims["CONV2_OUT_WIDTH"]
-    pool2_size = dims["CONV2_OUT_CHANNELS"] * dims["POOL2_OUT_HEIGHT"] * dims["POOL2_OUT_WIDTH"]
+    conv_1_size = dims["CONV_1_OUT_CHANNELS"] * dims["CONV_1_OUT_HEIGHT"] * dims["CONV_1_OUT_WIDTH"]
+    pool_1_size = dims["CONV_1_OUT_CHANNELS"] * dims["POOL_1_OUT_HEIGHT"] * dims["POOL_1_OUT_WIDTH"]
+    conv_2_size = dims["CONV_2_OUT_CHANNELS"] * dims["CONV_2_OUT_HEIGHT"] * dims["CONV_2_OUT_WIDTH"]
+    pool_2_size = dims["CONV_2_OUT_CHANNELS"] * dims["POOL_2_OUT_HEIGHT"] * dims["POOL_2_OUT_WIDTH"]
 
-    conv1_out = ensure_contiguous(np.zeros(conv1_size, dtype=np.intc))
-    pool1_out = ensure_contiguous(np.zeros(pool1_size, dtype=np.intc))
-    conv2_out = ensure_contiguous(np.zeros(conv2_size, dtype=np.intc))
-    pool2_out = ensure_contiguous(np.zeros(pool2_size, dtype=np.intc))
+    conv_1_output = ensure_contiguous(np.zeros(conv_1_size, dtype=np.intc))
+    pool_1_output = ensure_contiguous(np.zeros(pool_1_size, dtype=np.intc))
+    conv_2_output = ensure_contiguous(np.zeros(conv_2_size, dtype=np.intc))
+    pool_2_output = ensure_contiguous(np.zeros(pool_2_size, dtype=np.intc))
 
     # Required by C signature, not used in feature-map comparison plots
-    linear1_out = ensure_contiguous(np.zeros(dims["LINEAR1_OUT_FEATURES"], dtype=np.intc))
-    linear2_out = ensure_contiguous(np.zeros(dims["LINEAR2_OUT_FEATURES"], dtype=np.intc))
+    linear_1_output = ensure_contiguous(np.zeros(dims["LINEAR_1_OUT_FEATURES"], dtype=np.intc))
+    linear_2_output = ensure_contiguous(np.zeros(dims["LINEAR_2_OUT_FEATURES"], dtype=np.intc))
     output_out = ensure_contiguous(np.zeros(dims["OUTPUT_DIM"], dtype=np.intc))
-    class_indices = ensure_contiguous(np.zeros(1, dtype=np.uintc))
+    predictions = ensure_contiguous(np.zeros(1, dtype=np.uintc))
 
     c_int_p = ctypes.POINTER(ctypes.c_int)
     c_uint_p = ctypes.POINTER(ctypes.c_uint)
 
     c_convnet_forward = c_lib.convnet_forward
     c_convnet_forward(input_flat.ctypes.data_as(c_int_p),
-                      conv1_out.ctypes.data_as(c_int_p),
-                      pool1_out.ctypes.data_as(c_int_p),
-                      conv2_out.ctypes.data_as(c_int_p),
-                      pool2_out.ctypes.data_as(c_int_p),
-                      linear1_out.ctypes.data_as(c_int_p),
-                      linear2_out.ctypes.data_as(c_int_p),
+                      conv_1_output.ctypes.data_as(c_int_p),
+                      pool_1_output.ctypes.data_as(c_int_p),
+                      conv_2_output.ctypes.data_as(c_int_p),
+                      pool_2_output.ctypes.data_as(c_int_p),
+                      linear_1_output.ctypes.data_as(c_int_p),
+                      linear_2_output.ctypes.data_as(c_int_p),
                       output_out.ctypes.data_as(c_int_p),
-                      class_indices.ctypes.data_as(c_uint_p))
+                      predictions.ctypes.data_as(c_uint_p))
 
     # conv/pool outputs are Q(output_frac_bits) in C, convert back to float for visualization
     scale = float(1 << output_frac_bits)
 
-    conv1 = conv1_out.reshape(dims["CONV1_OUT_CHANNELS"],
-                              dims["CONV1_OUT_HEIGHT"],
-                              dims["CONV1_OUT_WIDTH"]).astype(np.float32) / scale
+    conv_1 = conv_1_output.reshape(dims["CONV_1_OUT_CHANNELS"],
+                                   dims["CONV_1_OUT_HEIGHT"],
+                                   dims["CONV_1_OUT_WIDTH"]).astype(np.float32) / scale
 
-    pool1 = pool1_out.reshape(dims["CONV1_OUT_CHANNELS"],
-                              dims["POOL1_OUT_HEIGHT"],
-                              dims["POOL1_OUT_WIDTH"]).astype(np.float32) / scale
+    pool_1 = pool_1_output.reshape(dims["CONV_1_OUT_CHANNELS"],
+                                   dims["POOL_1_OUT_HEIGHT"],
+                                   dims["POOL_1_OUT_WIDTH"]).astype(np.float32) / scale
 
-    conv2 = conv2_out.reshape(dims["CONV2_OUT_CHANNELS"],
-                              dims["CONV2_OUT_HEIGHT"],
-                              dims["CONV2_OUT_WIDTH"]).astype(np.float32) / scale
+    conv_2 = conv_2_output.reshape(dims["CONV_2_OUT_CHANNELS"],
+                                   dims["CONV_2_OUT_HEIGHT"],
+                                   dims["CONV_2_OUT_WIDTH"]).astype(np.float32) / scale
 
-    pool2 = pool2_out.reshape(dims["CONV2_OUT_CHANNELS"],
-                              dims["POOL2_OUT_HEIGHT"],
-                              dims["POOL2_OUT_WIDTH"]).astype(np.float32) / scale
+    pool_2 = pool_2_output.reshape(dims["CONV_2_OUT_CHANNELS"],
+                                   dims["POOL_2_OUT_HEIGHT"],
+                                   dims["POOL_2_OUT_WIDTH"]).astype(np.float32) / scale
 
-    quantized_maps = {"conv1": conv1, "pool1": pool1, "conv2": conv2, "pool2": pool2}
+    quantized_maps = {"conv1": conv_1, "pool1": pool_1, "conv2": conv_2, "pool2": pool_2}
 
-    return int(class_indices[0]), quantized_maps
+    return int(predictions[0]), quantized_maps
 
 
 def normalize_map(feature_map: np.ndarray) -> np.ndarray:
