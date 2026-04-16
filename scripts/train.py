@@ -17,6 +17,20 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 
+class AddGaussianNoise:
+    """
+    @brief Adds zero-mean Gaussian noise to tensor images.
+
+    @param std Standard deviation of the noise.
+    """
+    def __init__(self, std: float = 0.06):
+        self.std = std
+
+    def __call__(self, tensor: torch.Tensor):
+        noisy = tensor + torch.randn_like(tensor) * self.std
+        return torch.clamp(noisy, 0.0, 1.0)
+
+
 def train_epoch(model:nn.Module, data_loader: DataLoader, 
                 optimizer: Adam, loss_fn:nn.CrossEntropyLoss):
     """
@@ -179,13 +193,20 @@ def main(args):
                                           transforms.RandomRotation(30),
                                           transforms.RandomAffine(degrees=0, 
                                                                   translate=(0.25, 0.25), 
-                                                                  scale=(0.7, 1.3), shear=10),
+                                                                  scale=(0.5, 1.3), shear=10),
                                           transforms.RandomPerspective(distortion_scale=0.2, 
                                                                        p=0.5),
                                           transforms.ColorJitter(brightness=0.5, contrast=0.5),
                                           transforms.RandomInvert(p=0.5),
-                                          transforms.GaussianBlur(kernel_size=3),
                                           transforms.ToTensor(),
+                                          transforms.ElasticTransform(alpha=20.0, sigma=4.0),
+                                          transforms.RandomApply([
+                                              transforms.GaussianBlur(kernel_size=3,
+                                                                      sigma=(0.1, 0.8))
+                                          ], p=0.2),
+                                          transforms.RandomApply([
+                                              AddGaussianNoise(std=0.05)
+                                          ], p=0.2),
                                           transforms.Normalize((0.5,), (0.5,))])
 
     # No augmentation for testing
@@ -248,7 +269,7 @@ if __name__ == '__main__':
         description="Train a Convolutional Neural Network (CNN) on the MNIST dataset.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     
-    parser.add_argument('--num_epochs', type=int, default=50,
+    parser.add_argument('--num_epochs', type=int, default=100,
                         help='Total number of training epochs to run.')
     
     parser.add_argument('--batch_size', type=int, default=128,
