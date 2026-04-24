@@ -50,7 +50,7 @@ void convnet_forward(const int *input, int *conv_1_output, int *pool_1_output,
     argmax_per_row(logits, predictions, BATCH_SIZE, OUTPUT_DIM);
 }
 
-void run_convnet(const int *input, unsigned int *predictions)
+void convnet_run(const int *input, unsigned int *predictions)
 {
     int conv_1_output[BATCH_SIZE * CONV_1_OUT_CHANNELS * CONV_1_OUT_HEIGHT *
                       CONV_1_OUT_WIDTH];

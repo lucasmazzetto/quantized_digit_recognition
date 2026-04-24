@@ -9,8 +9,9 @@
 #define NUM_BITS 8
 #define INT8_MAX_VALUE 127
 #define FRAC_BITS 16
-#define ROUND_CONST \
-    (1 << (FRAC_BITS - 1))  // = 0.5 before right shifting to improve rounding
+
+// = 0.5 before right shifting to improve rounding
+#define ROUND_CONST (1 << (FRAC_BITS - 1))  
 
 /**
  * @brief Performs 2D max pooling.

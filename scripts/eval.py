@@ -38,7 +38,7 @@ def ensure_contiguous(array: np.ndarray) -> np.ndarray:
     return np.ascontiguousarray(array) if not array.flags["C_CONTIGUOUS"] else array
 
 
-def run_convnet(sample: torch.Tensor, c_lib) -> int:
+def convnet_run(sample: torch.Tensor, c_lib) -> int:
     """
     @brief Runs one quantized C inference sample.
 
@@ -53,12 +53,12 @@ def run_convnet(sample: torch.Tensor, c_lib) -> int:
     # Allocate output buffer for the predicted class index
     pred = ensure_contiguous(np.zeros(1, dtype=np.uintc))
 
-    # Mirror C pointer types used by run_convnet(const int*, unsigned int*)
+    # Mirror C pointer types used by convnet_run(const int*, unsigned int*)
     c_int_p = ctypes.POINTER(ctypes.c_int)
     c_uint_p = ctypes.POINTER(ctypes.c_uint)
 
-    c_run_convnet = c_lib.run_convnet
-    c_run_convnet(x.ctypes.data_as(c_int_p), pred.ctypes.data_as(c_uint_p))
+    c_convnet_run = c_lib.convnet_run
+    c_convnet_run(x.ctypes.data_as(c_int_p), pred.ctypes.data_as(c_uint_p))
 
     return int(pred[0])
 
@@ -287,8 +287,8 @@ def main(args):
     # Declare C function signature for safe ctypes calls
     c_int_p = ctypes.POINTER(ctypes.c_int)
     c_uint_p = ctypes.POINTER(ctypes.c_uint)
-    c_lib.run_convnet.argtypes = (c_int_p, c_uint_p)
-    c_lib.run_convnet.restype = None
+    c_lib.convnet_run.argtypes = (c_int_p, c_uint_p)
+    c_lib.convnet_run.restype = None
 
     dataset = datasets.MNIST(root=str(args.data_dir),
                              train=False,
@@ -326,7 +326,7 @@ def main(args):
 
             batch_size = labels.shape[0]
             for idx in range(batch_size):
-                quantized_prediction = run_convnet(samples_q[idx], c_lib)
+                quantized_prediction = convnet_run(samples_q[idx], c_lib)
                 original_prediction = int(original_predictions[idx])
                 label = int(labels[idx])
 

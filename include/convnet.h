@@ -11,7 +11,7 @@
  * @param input The input tensor.
  * @param predictions The [batch_size x 1] vector storing predicted class indices.
  */
-void run_convnet(const int *input, unsigned int *predictions);
+void convnet_run(const int *input, unsigned int *predictions);
 
 /**
  * @brief Shared neural-network forward function with intermediate outputs.
