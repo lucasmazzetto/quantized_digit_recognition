@@ -31,8 +31,8 @@ class AddGaussianNoise:
         return torch.clamp(noisy, 0.0, 1.0)
 
 
-def train_epoch(model:nn.Module, data_loader: DataLoader, 
-                optimizer: Adam, loss_fn:nn.CrossEntropyLoss):
+def train_epoch(model:nn.Module, data_loader: DataLoader,
+                optimizer: Adam, loss_fn:nn.CrossEntropyLoss, device: torch.device):
     """
     @brief Trains the model for one epoch.
 
@@ -49,6 +49,9 @@ def train_epoch(model:nn.Module, data_loader: DataLoader,
     loss = 0
     
     for x, y in data_loader:
+        x = x.to(device, non_blocking=True)
+        y = y.to(device, non_blocking=True)
+
         # Reset gradients
         optimizer.zero_grad()
         
@@ -68,7 +71,8 @@ def train_epoch(model:nn.Module, data_loader: DataLoader,
     return loss / num_batches
 
 
-def eval_epoch(model: nn.Module, data_loader: DataLoader, loss_fn: nn.CrossEntropyLoss):
+def eval_epoch(model: nn.Module, data_loader: DataLoader,
+               loss_fn: nn.CrossEntropyLoss, device: torch.device):
     """
     @brief Evaluates the model on the validation set.
 
@@ -86,6 +90,8 @@ def eval_epoch(model: nn.Module, data_loader: DataLoader, loss_fn: nn.CrossEntro
     # Disable gradient calculation
     with torch.no_grad():
         for x, y in data_loader:
+            x = x.to(device, non_blocking=True)
+            y = y.to(device, non_blocking=True)
             pred_y = model(x)
             batch_loss = loss_fn(pred_y, y)
             loss += batch_loss.item()
@@ -95,7 +101,7 @@ def eval_epoch(model: nn.Module, data_loader: DataLoader, loss_fn: nn.CrossEntro
 
 def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, 
           optimizer: Adam, loss_fn: nn.CrossEntropyLoss, num_epochs: int,
-          plot_path: Path):
+          plot_path: Path, device: torch.device):
     """
     @brief Runs the training loop for a specified number of epochs.
 
@@ -114,8 +120,8 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader,
     val_losses = []
     
     for epoch in range(num_epochs):
-        train_loss = train_epoch(model, train_loader, optimizer, loss_fn)
-        val_loss = eval_epoch(model, val_loader, loss_fn)
+        train_loss = train_epoch(model, train_loader, optimizer, loss_fn, device)
+        val_loss = eval_epoch(model, val_loader, loss_fn, device)
         train_losses.append(train_loss)
         val_losses.append(val_loss)
 
@@ -151,7 +157,7 @@ def plot_training_loss(train_losses:list, val_losses:list, output_path: Path):
     plt.close()
 
 
-def test(model: nn.Module, test_loader: DataLoader):
+def test(model: nn.Module, test_loader: DataLoader, device: torch.device):
     """
     @brief Evaluates the model on the test dataset and prints accuracy.
 
@@ -165,6 +171,9 @@ def test(model: nn.Module, test_loader: DataLoader):
     with torch.no_grad():
         acc = 0
         for samples, labels in test_loader:
+            samples = samples.to(device, non_blocking=True)
+            labels = labels.to(device, non_blocking=True)
+
             # Forward pass
             outputs = model(samples)
             
@@ -175,7 +184,7 @@ def test(model: nn.Module, test_loader: DataLoader):
             preds = torch.argmax(probs, dim=1)
             
             # Accumulate correct predictions
-            acc += (preds == labels).sum()
+            acc += (preds == labels).sum().item()
 
     print(f"Test Set Accuracy: {(acc / len(test_loader.dataset))*100.0:.3f}%")
 
@@ -184,6 +193,11 @@ def main(args):
     script_dir = Path(__file__).resolve().parent
     project_root = script_dir.parent
     images_dir = project_root / 'images'
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Training device: {device}")
+
+    if device.type == "cuda":
+        torch.backends.cudnn.benchmark = True
 
     # Create images directory to store training curves
     images_dir.mkdir(parents=True, exist_ok=True)
@@ -228,32 +242,37 @@ def main(args):
                                   download=True, transform=test_transform)
 
     # Initialize the Convolutional Neural Network
-    model = ConvNet(h=28, w=28, inputs=1, outputs=10)
+    model = ConvNet(h=28, w=28, inputs=1, outputs=10).to(device)
 
     # Set up the optimizer (Adam) and loss function (CrossEntropy)
     optimizer = Adam(model.parameters())
     loss_fn = nn.CrossEntropyLoss()
 
     # Create DataLoaders for batching and shuffling
-    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, 
-                              num_workers=args.num_workers, shuffle=True)
+    use_cuda = device.type == "cuda"
+
+    train_loader = DataLoader(train_dataset, batch_size=args.batch_size,
+                              num_workers=args.num_workers, shuffle=True,
+                              pin_memory=use_cuda)
     
-    val_loader = DataLoader(val_dataset, batch_size=args.batch_size, 
-                            num_workers=args.num_workers, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=args.batch_size,
+                            num_workers=args.num_workers, shuffle=True,
+                            pin_memory=use_cuda)
     
-    test_loader = DataLoader(test_dataset, batch_size=args.batch_size, 
-                             num_workers=args.num_workers, shuffle=False)
+    test_loader = DataLoader(test_dataset, batch_size=args.batch_size,
+                             num_workers=args.num_workers, shuffle=False,
+                             pin_memory=use_cuda)
     
     # Execute the training loop
     train_losses, val_losses = train(model, train_loader, val_loader, optimizer,
                                      loss_fn, args.num_epochs,
-                                     images_dir / 'training.png')
+                                     images_dir / 'training.png', device)
 
     # Save training history figure in images/training.png
     plot_training_loss(train_losses, val_losses, images_dir / 'training.png')
 
     # Evaluate the model on the test set
-    test(model, test_loader)
+    test(model, test_loader, device)
 
     os.makedirs(args.model_path, exist_ok=True)
     

@@ -38,7 +38,7 @@ def ensure_contiguous(array: np.ndarray) -> np.ndarray:
     return np.ascontiguousarray(array) if not array.flags["C_CONTIGUOUS"] else array
 
 
-def run_convnet(sample: torch.Tensor, c_lib) -> int:
+def convnet_run(sample: torch.Tensor, c_lib) -> int:
     """
     @brief Runs one quantized C inference sample.
 
@@ -53,12 +53,12 @@ def run_convnet(sample: torch.Tensor, c_lib) -> int:
     # Allocate output buffer for the predicted class index
     pred = ensure_contiguous(np.zeros(1, dtype=np.uintc))
 
-    # Mirror C pointer types used by run_convnet(const int*, unsigned int*)
+    # Mirror C pointer types used by convnet_run(const int*, unsigned int*)
     c_int_p = ctypes.POINTER(ctypes.c_int)
     c_uint_p = ctypes.POINTER(ctypes.c_uint)
 
-    c_run_convnet = c_lib.run_convnet
-    c_run_convnet(x.ctypes.data_as(c_int_p), pred.ctypes.data_as(c_uint_p))
+    c_convnet_run = c_lib.convnet_run
+    c_convnet_run(x.ctypes.data_as(c_int_p), pred.ctypes.data_as(c_uint_p))
 
     return int(pred[0])
 
@@ -287,8 +287,8 @@ def main(args):
     # Declare C function signature for safe ctypes calls
     c_int_p = ctypes.POINTER(ctypes.c_int)
     c_uint_p = ctypes.POINTER(ctypes.c_uint)
-    c_lib.run_convnet.argtypes = (c_int_p, c_uint_p)
-    c_lib.run_convnet.restype = None
+    c_lib.convnet_run.argtypes = (c_int_p, c_uint_p)
+    c_lib.convnet_run.restype = None
 
     dataset = datasets.MNIST(root=str(args.data_dir),
                              train=False,
@@ -322,11 +322,11 @@ def main(args):
             original_predictions = torch.argmax(original_logits, dim=1)
 
             # Convert normalized float input to fixed-point integer format expected by C
-            samples_q = (samples * (1 << args.input_frac_bits)).round().to(torch.int32)
+            samples_q = (samples * (1 << args.frac_bits)).round().to(torch.int32)
 
             batch_size = labels.shape[0]
             for idx in range(batch_size):
-                quantized_prediction = run_convnet(samples_q[idx], c_lib)
+                quantized_prediction = convnet_run(samples_q[idx], c_lib)
                 original_prediction = int(original_predictions[idx])
                 label = int(labels[idx])
 
@@ -411,8 +411,8 @@ if __name__ == "__main__":
 
     parser.add_argument("--num_workers", type=int, default=1, help="DataLoader workers.")
 
-    parser.add_argument("--input_frac_bits", type=int, default=16,
-                        help="Fixed-point fractional bits for input representation passed to C.")
+    parser.add_argument("--frac_bits", type=int, default=16,
+                        help="Fixed-point fractional bits used across C inference.")
     
     parser.add_argument("--max_samples", type=int, default=0,
                         help="If > 0, evaluate only this many samples.")

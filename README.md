@@ -108,7 +108,8 @@ From the project root, generate C source and header files from the quantized che
 python3 scripts/generate_params.py \
   --path models/quantized.pt \
   --output_dir src \
-  --header_dir include
+  --header_dir include \
+  --frac_bits 16
 ```
 
 ### 🧪 Evaluation
@@ -128,7 +129,7 @@ gcc -O3 -std=c11 -fPIC -shared -Iinclude \
 After building the shared library, run the evaluation script from the project root:
 
 ```bash
-python3 scripts/eval.py
+python3 scripts/eval.py --frac_bits 16
 ```
 
 ### 🖼️ Visualization
@@ -144,8 +145,7 @@ python3 scripts/extract_feature_maps.py \
   --float_model ./models/model.pt \
   --data_dir ./data \
   --images_dir ./images \
-  --input_frac_bits 16 \
-  --output_frac_bits 16
+  --frac_bits 16
 ```
 
 This script saves one image per label (`0` to `9`) as:
