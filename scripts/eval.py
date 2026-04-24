@@ -322,7 +322,7 @@ def main(args):
             original_predictions = torch.argmax(original_logits, dim=1)
 
             # Convert normalized float input to fixed-point integer format expected by C
-            samples_q = (samples * (1 << args.input_frac_bits)).round().to(torch.int32)
+            samples_q = (samples * (1 << args.frac_bits)).round().to(torch.int32)
 
             batch_size = labels.shape[0]
             for idx in range(batch_size):
@@ -411,8 +411,8 @@ if __name__ == "__main__":
 
     parser.add_argument("--num_workers", type=int, default=1, help="DataLoader workers.")
 
-    parser.add_argument("--input_frac_bits", type=int, default=16,
-                        help="Fixed-point fractional bits for input representation passed to C.")
+    parser.add_argument("--frac_bits", type=int, default=16,
+                        help="Fixed-point fractional bits used across C inference.")
     
     parser.add_argument("--max_samples", type=int, default=0,
                         help="If > 0, evaluate only this many samples.")

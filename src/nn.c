@@ -282,11 +282,11 @@ static void relu(int *data, const unsigned int size)
 }
 
 /**
- * @brief Quantizes Q16 activations into int8 values with symmetric rounding.
+ * @brief Quantizes Q(FRAC_BITS) activations into int8 values with symmetric rounding.
  *
- * @param input Input tensor in Q16 domain.
+ * @param input Input tensor in Q(FRAC_BITS) domain.
  * @param output Output tensor in int8 quantized domain.
- * @param input_scale Q16 scale factor used for quantization.
+ * @param input_scale Q(FRAC_BITS) scale factor used for quantization.
  * @param size Number of flattened tensor elements.
  */
 static void quantize(const int *input, int8_t *output, const int input_scale,
@@ -295,11 +295,11 @@ static void quantize(const int *input, int8_t *output, const int input_scale,
     unsigned int i;
 
     for (i = 0; i < size; i++) {
-        // Input and scale are Q16 so product is Q32 before shifting back
-        int64_t scaled_q32 = (int64_t)input[i] * (int64_t)input_scale;
+        // Input and scale are Q(FRAC_BITS) so product is Q(2 * FRAC_BITS)
+        int64_t scaled_product = (int64_t)input[i] * (int64_t)input_scale;
 
         int64_t quantized_value =
-            round_shift_right_symmetric(scaled_q32, (uint32_t)(2 * FXP_VALUE));
+            round_shift_right_symmetric(scaled_product, (uint32_t)(2 * FRAC_BITS));
 
         // Saturate before narrowing to int8 to prevent wraparound
         output[i] = saturate_to_int8(quantized_value);
@@ -324,23 +324,24 @@ static void dequantize_per_col(int *data, const int *weight_scale_inv,
                                const unsigned int output_features)
 {
     unsigned int k, n;
-    int64_t out_value_q32;
+    int64_t combined_inv_scale;
 
     for (n = 0; n < batch_size; n++) {
         for (k = 0; k < output_features; k++) {
-            // weight_scale_inv and input_scale_inv are Q16 values
-            // Their product is Q32 and after one shift by 16 the result is Q16
-            int64_t scaled_value_q16;
+            // weight_scale_inv and input_scale_inv are Q(FRAC_BITS) values
+            // Their product is Q(2 * FRAC_BITS) and after one shift by FRAC_BITS the result
+            // is Q(FRAC_BITS)
+            int64_t dequantized_value;
 
             // One inverse scale per output feature for linear layers
-            out_value_q32 =
+            combined_inv_scale =
                 (int64_t)weight_scale_inv[k] * (int64_t)input_scale_inv;
 
-            scaled_value_q16 = round_shift_right_symmetric(
-                out_value_q32 * (int64_t)data[n * output_features + k],
-                (uint32_t)FXP_VALUE);
+            dequantized_value = round_shift_right_symmetric(
+                combined_inv_scale * (int64_t)data[n * output_features + k],
+                (uint32_t)FRAC_BITS);
 
-            data[n * output_features + k] = (int)scaled_value_q16;
+            data[n * output_features + k] = (int)dequantized_value;
         }
     }
 }
@@ -362,29 +363,29 @@ static void dequantize_per_channel(int *data, const int *weight_scale_inv,
                                    const unsigned int output_size)
 {
     unsigned int k, n, c;
-    int64_t out_value_q32;
+    int64_t combined_inv_scale;
 
     for (n = 0; n < batch_size; n++) {
         for (c = 0; c < output_channels; c++) {
             // This scale is constant across all features of the same output channel
-            out_value_q32 =
+            combined_inv_scale =
                 (int64_t)weight_scale_inv[c] * (int64_t)input_scale_inv;
 
             for (k = 0; k < output_size; k++) {
                 unsigned int tensor_idx;
-                int64_t scaled_value_q32;
-                int64_t scaled_value_q16;
+                int64_t scaled_accumulator;
+                int64_t dequantized_value;
 
                 // Flatten (n, c, k) into one index for the contiguous tensor buffer
                 tensor_idx =
                     n * output_channels * output_size + c * output_size + k;
 
-                scaled_value_q32 = out_value_q32 * (int64_t)data[tensor_idx];
+                scaled_accumulator = combined_inv_scale * (int64_t)data[tensor_idx];
 
-                scaled_value_q16 = round_shift_right_symmetric(
-                    scaled_value_q32, (uint32_t)FXP_VALUE);
+                dequantized_value = round_shift_right_symmetric(
+                    scaled_accumulator, (uint32_t)FRAC_BITS);
 
-                data[tensor_idx] = (int)scaled_value_q16;
+                data[tensor_idx] = (int)dequantized_value;
             }
         }
     }
@@ -424,14 +425,14 @@ void linear_layer(const int *input, const int8_t *weights, int *output,
 {
     int8_t input_quantized[batch_size * input_features];
 
-    // Quantize Q16 activations to int8 domain expected by integer GEMM
+    // Quantize Q(FRAC_BITS) activations to int8 domain expected by integer GEMM
     quantize(input, input_quantized, input_scale, batch_size * input_features);
 
     // Integer matmul gives accumulators in int domain
     mat_mult(input_quantized, weights, output, batch_size, input_features,
              output_features);
 
-    // Bring accumulators back to Q16 for the next layer
+    // Bring accumulators back to Q(FRAC_BITS) for the next layer
     dequantize_per_col(output, weight_scale_inv, input_scale_inv, batch_size,
                        output_features);
 
@@ -453,7 +454,7 @@ void conv2d_layer(const int *input, const int8_t *weights, int *output,
     int8_t input_quantized[batch_size * input_channels * input_height *
                            input_width];
 
-    // Quantize Q16 activations to int8 domain expected by convolution
+    // Quantize Q(FRAC_BITS) activations to int8 domain expected by convolution
     quantize(input, input_quantized, input_scale,
              batch_size * input_channels * input_height * input_width);
 
@@ -463,7 +464,7 @@ void conv2d_layer(const int *input, const int8_t *weights, int *output,
            output_width, kernel_height, kernel_width, stride_height,
            stride_width);
 
-    // Bring accumulators back to Q16 then apply non-linearity
+    // Bring accumulators back to Q(FRAC_BITS) then apply non-linearity
     dequantize_per_channel(output, weight_scale_inv, input_scale_inv,
                            batch_size, output_channels,
                            output_height * output_width);

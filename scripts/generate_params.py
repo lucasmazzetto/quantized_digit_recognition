@@ -40,7 +40,7 @@ def to_numpy(value):
     return np.asarray(value)
 
 
-def scalar_to_fxp(value, frac_bits: int):
+def scalar_to_fixed_point(value, frac_bits: int):
     """
     @brief Convert scalar value to fixed-point integer.
 
@@ -51,7 +51,7 @@ def scalar_to_fxp(value, frac_bits: int):
     return int(np.rint(float(np.asarray(value)) * (1 << frac_bits)))
 
 
-def array_to_fxp(values, frac_bits: int):
+def array_to_fixed_point(values, frac_bits: int):
     """
     @brief Convert array values to fixed-point integer array.
 
@@ -220,9 +220,9 @@ def write_source_file(path: Path, state_dict, layer_indices, frac_bits: int):
 
         for layer_idx in layer_indices:
             layer_prefix = get_layer_prefix(layer_idx)
-            sx = scalar_to_fxp(state_dict[f'layer_{layer_idx}_s_x'], frac_bits)
-            sx_inv = scalar_to_fxp(state_dict[f'layer_{layer_idx}_s_x_inv'], frac_bits)
-            sw_inv = array_to_fxp(state_dict[f'layer_{layer_idx}_s_w_inv'], frac_bits)
+            sx = scalar_to_fixed_point(state_dict[f'layer_{layer_idx}_s_x'], frac_bits)
+            sx_inv = scalar_to_fixed_point(state_dict[f'layer_{layer_idx}_s_x_inv'], frac_bits)
+            sw_inv = array_to_fixed_point(state_dict[f'layer_{layer_idx}_s_w_inv'], frac_bits)
 
             f.write(f'const int {layer_prefix}_input_scale = {sx};\n\n')
             f.write(f'const int {layer_prefix}_input_scale_inv = {sx_inv};\n\n')
@@ -259,7 +259,7 @@ if __name__ == '__main__':
                         help='Input image width used to infer network dimensions.')
     parser.add_argument('--input_c', type=int, default=1,
                         help='Input channel count used to infer network dimensions.')
-    parser.add_argument('--fxp_frac_bits', type=int, default=16,
+    parser.add_argument('--frac_bits', type=int, default=16,
                         help='Number of fractional bits for fixed-point scale conversion.')
     args = parser.parse_args()
 
@@ -289,7 +289,7 @@ if __name__ == '__main__':
     source_path = args.output_dir / 'params.c'
 
     write_header_file(header_path, state_dict, layer_indices, dims)
-    write_source_file(source_path, state_dict, layer_indices, args.fxp_frac_bits)
+    write_source_file(source_path, state_dict, layer_indices, args.frac_bits)
 
     print(f'Wrote {header_path}')
     print(f'Wrote {source_path}')
