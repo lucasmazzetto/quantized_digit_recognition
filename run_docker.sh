@@ -9,6 +9,7 @@ HOST_GID="${HOST_GID:-$(id -g)}"
 HOST_USER="${HOST_USER:-$(id -un)}"
 DOCKER_IPC_MODE="${DOCKER_IPC_MODE:-host}"
 DOCKER_SHM_SIZE="${DOCKER_SHM_SIZE:-}"
+DOCKER_USE_GPU="${DOCKER_USE_GPU:-auto}"
 
 DOCKER_USER_FLAGS=(
   -u "${HOST_UID}:${HOST_GID}"
@@ -46,12 +47,37 @@ else
   DOCKER_TTY_FLAGS=(-it)
 fi
 
-docker run --rm \
-  "${DOCKER_TTY_FLAGS[@]}" \
-  --name "${CONTAINER_NAME}" \
-  "${DOCKER_MEMORY_FLAGS[@]}" \
-  "${DOCKER_USER_FLAGS[@]}" \
-  -v "${SCRIPT_DIR}:/app/neural_network" \
-  -w /app/neural_network \
+DOCKER_RUN_COMMON_ARGS=(
+  --rm
+  "${DOCKER_TTY_FLAGS[@]}"
+  --name "${CONTAINER_NAME}"
+  "${DOCKER_MEMORY_FLAGS[@]}"
+  "${DOCKER_USER_FLAGS[@]}"
+  -v "${SCRIPT_DIR}:/app/neural_network"
+  -w /app/neural_network
+)
+
+if [ "${DOCKER_USE_GPU}" = "0" ] || [ "${DOCKER_USE_GPU}" = "false" ]; then
+  docker run "${DOCKER_RUN_COMMON_ARGS[@]}" \
+    "${IMAGE_NAME}" \
+    "${CONTAINER_CMD[@]}"
+  exit 0
+fi
+
+if [ "${DOCKER_USE_GPU}" = "1" ] || [ "${DOCKER_USE_GPU}" = "true" ]; then
+  docker run "${DOCKER_RUN_COMMON_ARGS[@]}" \
+    --gpus all \
+    "${IMAGE_NAME}" \
+    "${CONTAINER_CMD[@]}"
+  exit 0
+fi
+
+# Auto mode: try GPU first, then fall back to CPU-only if unavailable.
+if docker run "${DOCKER_RUN_COMMON_ARGS[@]}" --gpus all "${IMAGE_NAME}" "${CONTAINER_CMD[@]}"; then
+  exit 0
+fi
+
+echo "GPU launch failed. Falling back to CPU-only container..." >&2
+docker run "${DOCKER_RUN_COMMON_ARGS[@]}" \
   "${IMAGE_NAME}" \
   "${CONTAINER_CMD[@]}"

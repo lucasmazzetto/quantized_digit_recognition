@@ -164,19 +164,18 @@ def extract_original_feature_maps(sample: torch.Tensor, model: ConvNet) -> Dict[
 
 
 def run_c_convnet_forward(sample: torch.Tensor, c_lib, dims: Dict[str, int],
-                          input_frac_bits: int, output_frac_bits: int) -> Tuple[int, Dict[str, np.ndarray]]:
+                          frac_bits: int) -> Tuple[int, Dict[str, np.ndarray]]:
     """
     @brief Runs C convnet_forward and returns dequantized conv/pool outputs.
 
     @param sample One MNIST sample tensor with shape (1, 28, 28).
     @param c_lib Loaded C shared library.
     @param dims Model dimensions parsed from params.h.
-    @param input_frac_bits Fractional bits used to quantize input before C call.
-    @param output_frac_bits Fractional bits used to dequantize C outputs for plotting.
+    @param frac_bits Fractional bits used across fixed-point C inference.
     @return Predicted class and dictionary with dequantized conv/pool feature maps.
     """
     # Use the same input preparation strategy as scripts/eval.py
-    input_quantized = (sample * (1 << input_frac_bits)).round().to(torch.int32)
+    input_quantized = (sample * (1 << frac_bits)).round().to(torch.int32)
     input_flat = ensure_contiguous(input_quantized.flatten().cpu().numpy().astype(np.intc))
 
     conv_1_size = dims["CONV_1_OUT_CHANNELS"] * dims["CONV_1_OUT_HEIGHT"] * dims["CONV_1_OUT_WIDTH"]
@@ -209,8 +208,8 @@ def run_c_convnet_forward(sample: torch.Tensor, c_lib, dims: Dict[str, int],
                       output_out.ctypes.data_as(c_int_p),
                       predictions.ctypes.data_as(c_uint_p))
 
-    # conv/pool outputs are Q(output_frac_bits) in C, convert back to float for visualization
-    scale = float(1 << output_frac_bits)
+    # conv/pool outputs are Q(frac_bits) in C, convert back to float for visualization
+    scale = float(1 << frac_bits)
 
     conv_1 = conv_1_output.reshape(dims["CONV_1_OUT_CHANNELS"],
                                    dims["CONV_1_OUT_HEIGHT"],
@@ -363,8 +362,7 @@ def main(args):
             original_maps = extract_original_feature_maps(sample, original_model)
             
             prediction, quantized_maps = run_c_convnet_forward(sample, c_lib, dims,
-                                                               args.input_frac_bits,
-                                                               args.output_frac_bits)
+                                                               args.frac_bits)
 
             output_path = args.images_dir / f"feature_maps_{label}.png"
 
@@ -394,10 +392,7 @@ if __name__ == "__main__":
     parser.add_argument("--images_dir", type=Path, default=Path("./images"),
                         help="Directory where feature-map comparison images are saved.")
     
-    parser.add_argument("--input_frac_bits", type=int, default=16,
-                        help="Fractional bits used for input conversion before C inference.")
-    
-    parser.add_argument("--output_frac_bits", type=int, default=16,
-                        help="Fractional bits used to dequantize C intermediate outputs.")
+    parser.add_argument("--frac_bits", type=int, default=16,
+                        help="Fixed-point fractional bits used across C inference.")
 
     main(parser.parse_args())
