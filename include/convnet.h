@@ -11,7 +11,7 @@
  * @param input The input tensor.
  * @param predictions The [batch_size x 1] vector storing predicted class indices.
  */
-void convnet_run(const int *input, unsigned int *predictions);
+void convnet_run(const int* input, unsigned int* predictions);
 
 /**
  * @brief Shared neural-network forward function with intermediate outputs.
@@ -26,9 +26,8 @@ void convnet_run(const int *input, unsigned int *predictions);
  * @param logits The final logits buffer.
  * @param predictions The [batch_size x 1] vector storing predicted class indices.
  */
-void convnet_forward(const int *input, int *conv_1_output, int *pool_1_output,
-                     int *conv_2_output, int *pool_2_output,
-                     int *linear_1_output, int *linear_2_output, int *logits,
-                     unsigned int *predictions);
+void convnet_forward(const int* input, int* conv_1_output, int* pool_1_output, int* conv_2_output,
+                     int* pool_2_output, int* linear_1_output, int* linear_2_output, int* logits,
+                     unsigned int* predictions);
 
-#endif  // CONVNET_H
+#endif    // CONVNET_H

@@ -10,8 +10,7 @@
 #define INT8_MAX_VALUE 127
 #define FRAC_BITS 16
 
-// = 0.5 before right shifting to improve rounding
-#define ROUND_CONST (1 << (FRAC_BITS - 1))  
+#define ROUND_CONST (1 << (FRAC_BITS - 1)) // = 0.5 before right shifting to improve rounding
 
 /**
  * @brief Performs 2D max pooling.
@@ -29,16 +28,15 @@
  * @param stride_height The height stride.
  * @param stride_width The width stride.
  */
-void pooling2d(int *input, int *output, int batch_size, int channels,
-               int input_height, int input_width, int output_height,
-               int output_width, int kernel_height, int kernel_width,
-               int stride_height, int stride_width);
+void pooling2d(int* input, int* output, int batch_size, int channels, int input_height,
+               int input_width, int output_height, int output_width, int kernel_height,
+               int kernel_width, int stride_height, int stride_width);
 
 /**
  * @brief Computes argmax along columns for each row of a flattened matrix.
  *
- * Interprets `input` as row-major [batch_size, output_features]. For each
- * row `n`, stores in `indices[n]` the column index `m` with the maximum value.
+ * Interprets `input` as row-major [batch_size, output_features]. For each row `n`, stores in
+ * `indices[n]` the column index `m` with the maximum value.
  * If multiple columns share the maximum, the first one is kept.
  *
  * @param input Input matrix flattened in row-major order.
@@ -46,15 +44,14 @@ void pooling2d(int *input, int *output, int batch_size, int channels,
  * @param batch_size Number of matrix rows.
  * @param output_features Number of columns per row. Must be greater than zero.
  */
-void argmax_per_row(const int *input, unsigned int *indices,
-                    const unsigned int batch_size,
+void argmax_per_row(const int* input, unsigned int* indices, const unsigned int batch_size,
                     const unsigned int output_features);
 
 /**
  * @brief Runs a linear neural-network layer without bias.
  *
- * Input is quantized before multiplication with weights and then dequantized
- * per-column before optional activation.
+ * Input is quantized before multiplication with weights and then dequantized per-column before
+ * optional activation.
  *
  * @param input The [batch_size x input_features] input matrix.
  * @param weights The [input_features x output_features] layer weight matrix.
@@ -67,18 +64,15 @@ void argmax_per_row(const int *input, unsigned int *indices,
  * @param output_features The output feature size.
  * @param apply_relu Non-zero if ReLU must be applied.
  */
-void linear_layer(const int *input, const int8_t *weights, int *output,
-                  const int input_scale, const int *weight_scale_inv,
-                  const int input_scale_inv, const unsigned int batch_size,
-                  const unsigned int input_features,
-                  const unsigned int output_features,
-                  const unsigned int apply_relu);
+void linear_layer(const int* input, const int8_t* weights, int* output, const int input_scale,
+                  const int* weight_scale_inv, const int input_scale_inv,
+                  const unsigned int batch_size, const unsigned int input_features,
+                  const unsigned int output_features, const unsigned int apply_relu);
 
 /**
  * @brief Runs a quantized 2D convolutional layer with ReLU activation.
  *
- * Input is quantized before convolution and then dequantized per-channel
- * before activation.
+ * Input is quantized before convolution and then dequantized per-channel before activation.
  *
  * @param input The (batch_size, input_channels, input_height, input_width) input tensor.
  * @param weights The (output_channels, input_channels, kernel_height, kernel_width) weight tensor.
@@ -98,14 +92,11 @@ void linear_layer(const int *input, const int8_t *weights, int *output,
  * @param stride_height The stride height.
  * @param stride_width The stride width.
  */
-void conv2d_layer(const int *input, const int8_t *weights, int *output,
-                  const int input_scale, const int *weight_scale_inv,
-                  const int input_scale_inv, const unsigned int batch_size,
-                  const unsigned int input_channels,
-                  const unsigned int output_channels, const int input_height,
-                  const int input_width, const int output_height,
-                  const int output_width, const int kernel_height,
-                  const int kernel_width, const int stride_height,
-                  const int stride_width);
+void conv2d_layer(const int* input, const int8_t* weights, int* output, const int input_scale,
+                  const int* weight_scale_inv, const int input_scale_inv,
+                  const unsigned int batch_size, const unsigned int input_channels,
+                  const unsigned int output_channels, const int input_height, const int input_width,
+                  const int output_height, const int output_width, const int kernel_height,
+                  const int kernel_width, const int stride_height, const int stride_width);
 
-#endif  // NN_H
+#endif    // NN_H
