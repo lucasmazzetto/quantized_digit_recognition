@@ -28,7 +28,7 @@
  * @param stride_height The height stride.
  * @param stride_width The width stride.
  */
-void pooling2d(int* input, int* output, int batch_size, int channels, int input_height,
+void pooling2d(const int* input, int* output, int batch_size, int channels, int input_height,
                int input_width, int output_height, int output_width, int kernel_height,
                int kernel_width, int stride_height, int stride_width);
 
