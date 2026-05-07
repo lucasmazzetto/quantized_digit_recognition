@@ -225,7 +225,7 @@ void pooling2d(const int *input, int *output, int batch_size, int channels, int 
 
                     const int output_index =
                         output_batch_offset + output_channel_offset + output_channel_position;
-                        
+
                     output[output_index] = max_value;
                 }
             }

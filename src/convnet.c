@@ -1,9 +1,9 @@
 #include "convnet.h"
 #include "nn.h"
 
-void convnet_forward(const int* input, int* conv_1_output, int* pool_1_output, int* conv_2_output,
-                     int* pool_2_output, int* linear_1_output, int* linear_2_output, int* logits,
-                     unsigned int* predictions)
+void convnet_forward(const int *input, int *conv_1_output, int *pool_1_output, int *conv_2_output,
+                     int *pool_2_output, int *linear_1_output, int *linear_2_output, int *logits,
+                     unsigned int *predictions)
 {
     // conv1: input -> conv -> dequant -> ReLU
     conv2d_layer(input, conv_1_weight, conv_1_output, conv_1_input_scale, conv_1_weight_scale_inv,
@@ -42,7 +42,7 @@ void convnet_forward(const int* input, int* conv_1_output, int* pool_1_output, i
     argmax_per_row(logits, predictions, BATCH_SIZE, OUTPUT_DIM);
 }
 
-void convnet_run(const int* input, unsigned int* predictions)
+void convnet_run(const int *input, unsigned int *predictions)
 {
     int conv_1_output[BATCH_SIZE * CONV_1_OUT_CHANNELS * CONV_1_OUT_HEIGHT * CONV_1_OUT_WIDTH];
     int pool_1_output[BATCH_SIZE * CONV_1_OUT_CHANNELS * POOL_1_OUT_HEIGHT * POOL_1_OUT_WIDTH];
