@@ -75,12 +75,13 @@ From the project root, run post-training quantization to convert the trained
 floating-point checkpoint into quantized weights and scaling constants used by
 the C inference pipeline.
 
+This example uses `max_value`, which sets each layer's activation threshold to
+the maximum absolute activation observed during calibration:
+
 ```bash
 python3 scripts/quantize.py \
   --filename model.pt \
-  --calibrator histogram_observer \
-  --num_bins 128 \
-  --percentile 99.9 \
+  --calibrator max_value \
   --save_dir ./models \
   --data_dir ./data
 ```
@@ -88,17 +89,27 @@ python3 scripts/quantize.py \
 Available calibration methods:
 
 - `histogram_observer`: uses PyTorch `HistogramObserver`.
-- `kl_entropy`: uses a custom histogram + KL-divergence threshold search.
 - `max_value`: uses the maximum absolute activation value.
 - `percentile`: uses a histogram percentile threshold (`--percentile`).
 
-Notes:
+Available parameters:
 
-- `--num_bins` is used by histogram-based calibrators.
-- `--percentile` is used when `--calibrator percentile` is selected.
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `--filename` | `model.pt` | Trained checkpoint filename inside `--save_dir`. |
+| `--calibrator` | `histogram_observer` | Calibration method: `max_value`, `percentile`, or `histogram_observer`. |
+| `--num_bins` | `128` | Number of histogram bins used by `histogram_observer` and `percentile`; unused by `max_value`. |
+| `--percentile` | `99.9` | Percentile threshold used only by the `percentile` calibrator. |
+| `--save_dir` | `./models` | Directory containing the trained checkpoint and receiving `quantized.pt`. |
+| `--data_dir` | `./data` | Directory where MNIST calibration data is read or downloaded. |
+| `-h`, `--help` | — | Show the available options and exit. |
 
 This step creates `models/quantized.pt`, which is the input for C parameter
 generation.
+
+After changing calibration settings, regenerate the quantized checkpoint and C
+parameters, then rebuild the shared library. Retraining the floating-point model
+is not required.
 
 ### 🧩 Generate C Parameters
 
