@@ -263,7 +263,7 @@ if __name__ == '__main__':
                         help='Number of fractional bits for fixed-point scale conversion.')
     args = parser.parse_args()
 
-    checkpoint = torch.load(args.path, weights_only=False)
+    checkpoint = torch.load(args.path, map_location="cpu", weights_only=False)
     if 'state_dict' not in checkpoint:
         raise KeyError(f"'state_dict' not found in checkpoint: {args.path}")
     state_dict = checkpoint['state_dict']
