@@ -317,7 +317,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # Load trained floating-point checkpoint
-    saved_stats = torch.load(os.path.join(args.save_dir, args.filename))
+    saved_stats = torch.load(os.path.join(args.save_dir, args.filename), map_location="cpu")
     state_dict = saved_stats['state_dict']
 
     model = ConvNet(h=28, w=28, inputs=1, outputs=10)
