@@ -74,6 +74,8 @@ def collect_amax_hist_observer(model: nn.Module, data_loader: DataLoader,
     for layer_idx in layer_modules:
         observers[layer_idx] = HistogramObserver(dtype=torch.qint8,
                                                  qscheme=torch.per_tensor_symmetric,
+                                                 quant_min=-127,
+                                                 quant_max=127,
                                                  bins=num_bins)
 
     def hook_callback(layer_idx: int, tensor: torch.Tensor):
@@ -86,125 +88,8 @@ def collect_amax_hist_observer(model: nn.Module, data_loader: DataLoader,
     for layer_idx, observer in observers.items():
         scale, _ = observer.calculate_qparams()
         scale_value = float(scale.item())
-        # For symmetric int8, amax ~= scale * 127
+        # Match C's [-127, 127] range and zero point 0: amax = scale * 127
         activation_amax[layer_idx] = max(scale_value * 127.0, 1e-12)
-
-    return activation_amax
-
-
-def compute_kl_amax_from_histogram(histogram: np.ndarray, max_abs: float,
-                                   num_quantized_bins: int = 128):
-    """
-    @brief Computes KL-divergence threshold from an absolute-value histogram.
-
-    @param histogram Absolute-value histogram counts.
-    @param max_abs Maximum absolute value represented by the histogram.
-    @param num_quantized_bins Number of bins used by the simulated quantized distribution.
-    @return Estimated amax threshold.
-    """
-    if max_abs <= 0.0:
-        return 1e-12
-
-    hist = histogram.astype(np.float64)
-    num_bins = hist.shape[0]
-
-    if np.sum(hist) == 0.0:
-        return max_abs
-
-    start_bin = max(num_quantized_bins, 2)
-    best_kl = np.inf
-    best_threshold_bin = num_bins - 1
-
-    for threshold_bin in range(start_bin, num_bins + 1):
-        sliced = hist[:threshold_bin].copy()
-        # Fold right-tail outliers into the last kept bin
-        sliced[-1] += np.sum(hist[threshold_bin:])
-
-        total = np.sum(sliced)
-        if total <= 0.0:
-            continue
-
-        p = sliced / total
-
-        quantized = np.zeros(num_quantized_bins, dtype=np.float64)
-        for q_idx in range(num_quantized_bins):
-            # Merge original bins into quantized bins
-            start = int(np.floor(q_idx * threshold_bin / num_quantized_bins))
-            end = int(np.floor((q_idx + 1) * threshold_bin / num_quantized_bins))
-            if end <= start:
-                end = start + 1
-            quantized[q_idx] = np.sum(p[start:end])
-
-        q = np.zeros_like(p)
-        for q_idx in range(num_quantized_bins):
-            # Redistribute each quantized bin uniformly back to original resolution
-            start = int(np.floor(q_idx * threshold_bin / num_quantized_bins))
-            end = int(np.floor((q_idx + 1) * threshold_bin / num_quantized_bins))
-            if end <= start:
-                end = start + 1
-
-            if quantized[q_idx] > 0.0:
-                q[start:end] = quantized[q_idx] / (end - start)
-
-        p_nonzero = p > 0.0
-        q_nonzero = np.where(q > 0.0, q, 1e-12)
-        # Choose threshold minimizing KL divergence between p and reconstructed q
-        kl_value = np.sum(p[p_nonzero] * np.log(p[p_nonzero] / q_nonzero[p_nonzero]))
-
-        if kl_value < best_kl:
-            best_kl = kl_value
-            best_threshold_bin = threshold_bin
-
-    return max_abs * (float(best_threshold_bin) / float(num_bins))
-
-
-def collect_amax_kl_entropy(model: nn.Module, data_loader: DataLoader,
-                            layer_modules: dict, num_bins: int):
-    """
-    @brief Collects activation amax values using custom KL/entropy calibration.
-
-    @param model Model used for calibration.
-    @param data_loader Calibration data loader.
-    @param layer_modules Mapping layer index -> module.
-    @param num_bins Number of bins in calibration histograms.
-    @return Mapping layer index -> activation amax.
-    """
-    # Collect max abs for stable histogram ranges
-    layer_max = {layer_idx: 0.0 for layer_idx in layer_modules}
-
-    def collect_max(layer_idx: int, tensor: torch.Tensor):
-        current_max = float(tensor.abs().max().item())
-        if current_max > layer_max[layer_idx]:
-            layer_max[layer_idx] = current_max
-
-    run_calibration_pass(model, data_loader, layer_modules, collect_max)
-
-    # Collect absolute-value histograms with fixed [0, max_abs] ranges
-    layer_hists = {layer_idx: np.zeros(num_bins, dtype=np.float64) for layer_idx in layer_modules}
-
-    def collect_hist(layer_idx: int, tensor: torch.Tensor):
-        max_abs = layer_max[layer_idx]
-        if max_abs <= 0.0:
-            return
-
-        abs_tensor = tensor.abs().cpu().flatten()
-        hist = torch.histc(abs_tensor, bins=num_bins, min=0.0, max=max_abs)
-        layer_hists[layer_idx] += hist.numpy().astype(np.float64)
-
-    run_calibration_pass(model, data_loader, layer_modules, collect_hist)
-
-    activation_amax = {}
-
-    for layer_idx in layer_modules:
-        max_abs = layer_max[layer_idx]
-        if max_abs <= 0.0:
-            activation_amax[layer_idx] = 1e-12
-            continue
-
-        # Convert histogram to a KL-selected clipping threshold
-        activation_amax[layer_idx] = max(compute_kl_amax_from_histogram(layer_hists[layer_idx],
-                                                                         max_abs),
-                                         1e-12)
 
     return activation_amax
 
@@ -395,9 +280,6 @@ def calibrate_activation_amax(model: nn.Module, data_loader: DataLoader,
     if calibrator == 'histogram_observer':
         return collect_amax_hist_observer(model, data_loader, layer_modules, num_bins)
 
-    if calibrator == 'kl_entropy':
-        return collect_amax_kl_entropy(model, data_loader, layer_modules, num_bins)
-
     if calibrator == 'max_value':
         return collect_amax_max_value(model, data_loader, layer_modules)
 
@@ -419,7 +301,7 @@ if __name__ == '__main__':
                         help='Number of bins used for histogram-based calibration.')
     
     parser.add_argument('--calibrator', type=str,
-                        choices=['histogram_observer', 'kl_entropy', 'max_value', 'percentile'],
+                        choices=['histogram_observer', 'max_value', 'percentile'],
                         default='histogram_observer',
                         help='Calibration strategy used to estimate activation amax.')
 
